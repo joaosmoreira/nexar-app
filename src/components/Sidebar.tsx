@@ -197,7 +197,7 @@ export function Sidebar() {
           <Layers className="text-sky-400 group-hover:text-sky-300" size={18} />
         </div>
         <div>
-          <h1 className="text-sm font-semibold tracking-wide text-slate-200 group-hover:text-white transition-colors">Work Manager</h1>
+          <h1 className="text-sm font-semibold tracking-wide text-slate-200 group-hover:text-white transition-colors">Nexar HUB</h1>
           <p className="text-[10px] text-sky-500/70 group-hover:text-sky-400 uppercase tracking-wider font-medium transition-colors">Ir para o HUB Principal</p>
         </div>
       </button>

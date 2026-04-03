@@ -1,4 +1,4 @@
-# Industrial Work Manager
+# Nexar
 
 Aplicação de arquitetura híbrida (Desenvolvida em Tauri + React) para controlo, monitorização e gestão global de Produção de Fábrica.
 Criada para otimizar os ecrãs dispersos de estaleiro e organizar Obras e O.F.s num ambiente Premium e focado puramente em UX/UI tátil e percetível de alto contraste.
