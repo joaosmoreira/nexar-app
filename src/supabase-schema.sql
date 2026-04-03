@@ -29,3 +29,9 @@ CREATE TABLE public.tarefas (
   concluido boolean DEFAULT false,
   ordem_index int8 NOT NULL
 );
+
+-- 5. Adicionar a funcionalidade Arquivo à Tabela de Projetos
+ALTER TABLE public.projectos ADD COLUMN arquivado boolean DEFAULT false;
+
+-- 6. Adicionar a funcionalidade de Correr Lista de Últimos Movimentos
+ALTER TABLE public.projectos ADD COLUMN ultimo_movimento timestamp with time zone DEFAULT now();
