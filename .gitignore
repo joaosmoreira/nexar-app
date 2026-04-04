@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Variáveis de Segurança (Evitar Leak de Keys de Base de Dados)
+.env
+.env.local
+.env.*

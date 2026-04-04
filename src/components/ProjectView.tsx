@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { createOF, deleteProjeto, arquivarProjeto, Projeto, OrdemFabrico } from '../services/api';
 import { supabase } from '../supabaseClient';
-import { exportToExcel, exportToJson, exportProjectExcelWithTasks } from '../lib/exportUtils';
+import { exportToJson, exportProjectExcelWithTasks } from '../lib/exportUtils';
 import { FileDown, PlusCircle, Archive, Trash2 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { cn } from '../lib/utils';
@@ -13,7 +13,7 @@ interface OFWithProgress extends OrdemFabrico {
 }
 
 export function ProjectView({ projetoId }: { projetoId: number }) {
-  const { setSelectedOf } = useAppStore();
+
   const [projeto, setProjeto] = useState<Projeto | null>(null);
   const [ofs, setOfs] = useState<OFWithProgress[]>([]);
   const [loading, setLoading] = useState(true);

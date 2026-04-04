@@ -1,17 +1,12 @@
 import * as XLSX from 'xlsx';
 
-export const exportToExcel = (data: any[], filename: string) => {
-  const worksheet = XLSX.utils.json_to_sheet(data);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Sheet1");
-  XLSX.writeFile(workbook, `${filename}.xlsx`);
-};
+const isTauri = () => '__TAURI_INTERNALS__' in window;
 
-export const exportProjectExcelWithTasks = (projetoNome: string, cliente: string, ofs: any[], filename: string) => {
+export const exportProjectExcelWithTasks = async (projetoNome: string, cliente: string, ofs: any[], filename: string) => {
   const data: any[][] = [];
   
   // Cabeçalho Principal Mestre
-  data.push(["Obra", `${projetoNome}${cliente ? ` - ${cliente}` : ''}`]);
+  data.push(["Obra", `${projetoNome}${cliente && cliente !== 'Desconhecido' ? ` - ${cliente}` : ''}`]);
   data.push(["Data de Registo", new Date().toLocaleDateString('pt-PT')]);
   data.push([]); // blank row
 
@@ -37,15 +32,70 @@ export const exportProjectExcelWithTasks = (projetoNome: string, cliente: string
   const worksheet = XLSX.utils.aoa_to_sheet(data);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, "Progresso Obras");
-  XLSX.writeFile(workbook, `${filename}.xlsx`);
+
+  if (isTauri()) {
+     const { save } = await import('@tauri-apps/plugin-dialog');
+     const { writeFile } = await import('@tauri-apps/plugin-fs');
+     try {
+       const filePath = await save({
+         filters: [{ name: 'Excel Workbook', extensions: ['xlsx'] }],
+         defaultPath: `${filename}.xlsx`
+       });
+       if (filePath) {
+          const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+          await writeFile(filePath, new Uint8Array(excelBuffer));
+       }
+     } catch (e: any) { alert("Erro ao guardar documento: " + e.message); }
+  } else {
+     // Fallback para quando o João testa no Google Chrome / Safari normal ("npm run dev" fora da App)
+     XLSX.writeFile(workbook, `${filename}.xlsx`);
+  }
 };
 
-export const exportToJson = (data: any[], filename: string) => {
-  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data, null, 2));
-  const downloadAnchorNode = document.createElement('a');
-  downloadAnchorNode.setAttribute("href",     dataStr);
-  downloadAnchorNode.setAttribute("download", filename + ".json");
-  document.body.appendChild(downloadAnchorNode); // required for firefox
-  downloadAnchorNode.click();
-  downloadAnchorNode.remove();
+export const exportToExcel = async (data: any[], filename: string) => {
+  const worksheet = XLSX.utils.json_to_sheet(data);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Folha1");
+
+  if (isTauri()) {
+     const { save } = await import('@tauri-apps/plugin-dialog');
+     const { writeFile } = await import('@tauri-apps/plugin-fs');
+     try {
+       const filePath = await save({
+         filters: [{ name: 'Excel Workbook', extensions: ['xlsx'] }],
+         defaultPath: `${filename}.xlsx`
+       });
+       if (filePath) {
+          const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+          await writeFile(filePath, new Uint8Array(excelBuffer));
+       }
+     } catch (e: any) { alert("Erro ao guardar excell: " + e.message); }
+  } else {
+     XLSX.writeFile(workbook, `${filename}.xlsx`);
+  }
+};
+
+export const exportToJson = async (data: any[], filename: string) => {
+  if (isTauri()) {
+     const { save } = await import('@tauri-apps/plugin-dialog');
+     const { writeTextFile } = await import('@tauri-apps/plugin-fs');
+     try {
+       const filePath = await save({
+         filters: [{ name: 'JSON Document', extensions: ['json'] }],
+         defaultPath: `${filename}.json`
+       });
+       if (filePath) {
+          await writeTextFile(filePath, JSON.stringify(data, null, 2));
+       }
+     } catch (e: any) { alert("Erro ao guardar json: " + e.message); }
+  } else {
+     // Browser nativo
+     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data, null, 2));
+     const downloadAnchorNode = document.createElement('a');
+     downloadAnchorNode.setAttribute("href", dataStr);
+     downloadAnchorNode.setAttribute("download", filename + ".json");
+     document.body.appendChild(downloadAnchorNode);
+     downloadAnchorNode.click();
+     downloadAnchorNode.remove();
+  }
 };

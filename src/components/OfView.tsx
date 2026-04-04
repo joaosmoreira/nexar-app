@@ -168,12 +168,19 @@ export function OfView({ ofId }: { ofId: number }) {
               <Trash2 size={16} /> Apagar O.F.
             </button>
             <div className="w-px bg-slate-700/50 mx-2" />
-            <button onClick={onExportJson} className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium border border-slate-700 rounded-lg transition-colors">
-              <FileDown size={16} /> JSON
-            </button>
-            <button onClick={onExportExcel} className="flex items-center gap-2 px-4 py-2 bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 border border-emerald-500/30 text-sm font-medium rounded-lg transition-colors">
-              <FileDown size={16} /> EXCEL
-            </button>
+            <div className="relative group">
+              <button className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium border border-slate-700 rounded-lg transition-colors">
+                <FileDown size={16} /> Exportar
+              </button>
+              <div className="absolute right-0 top-full mt-2 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 overflow-hidden flex flex-col">
+                <button onClick={onExportExcel} className="flex items-center justify-between w-full text-left px-4 py-3 hover:bg-slate-700 text-emerald-400 font-medium text-sm border-b border-slate-700/50 transition-colors">
+                   Excel <span className="text-[10px] text-emerald-500/50 border border-emerald-500/30 px-1 rounded">XLSX</span>
+                </button>
+                <button onClick={onExportJson} className="flex items-center justify-between w-full text-left px-4 py-3 hover:bg-slate-700 text-slate-300 text-sm transition-colors">
+                   Backup <span className="text-[10px] text-slate-500 border border-slate-600 px-1 rounded">JSON</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>

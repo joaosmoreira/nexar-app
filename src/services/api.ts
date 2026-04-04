@@ -234,3 +234,27 @@ export async function fetchDashboardMetrics(isArchiveMode: boolean) {
   if (error) throw error;
   return data;
 }
+
+export async function globalSearch(term: string) {
+  if (!term || term.trim().length < 2) return { projetos: [], ofs: [] };
+  
+  const searchPattern = `%${term.trim()}%`;
+
+  const [pResult, oResult] = await Promise.all([
+    supabase
+      .from('projectos')
+      .select('id, nome, cliente, arquivado')
+      .or(`nome.ilike.${searchPattern},cliente.ilike.${searchPattern}`)
+      .limit(10),
+    supabase
+      .from('ordens_fabrico')
+      .select('id, projeto_id, nome_of, numero_of, projectos(nome, cliente)')
+      .or(`nome_of.ilike.${searchPattern},numero_of.ilike.${searchPattern}`)
+      .limit(10)
+  ]);
+
+  return {
+    projetos: pResult.data || [],
+    ofs: oResult.data || []
+  };
+}

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { fetchProjetos, fetchOfsByProjeto, createProjeto, fetchProjetosArquivados, Projeto, OrdemFabrico } from '../services/api';
-import { Folder, FileCog, Layers, Plus, Archive, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Folder, FileCog, Layers, Plus, Archive, AlertTriangle, CheckCircle2, Search } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Modal } from './Modal';
 
@@ -146,7 +146,8 @@ export function Sidebar() {
     e.preventDefault();
     if (!newProjRef) return;
     try {
-      await createProjeto(newProjRef, newProjCli.trim() === "" ? "Desconhecido" : newProjCli);
+      const formattedRef = `GS${newProjRef}`;
+      await createProjeto(formattedRef, newProjCli.trim() === "" ? "Desconhecido" : newProjCli);
       await loadProjetos();
       setModalOpen(false);
       setNewProjRef("");
@@ -161,15 +162,21 @@ export function Sidebar() {
       <Modal isOpen={modalOpen} title="Novo Projeto" onClose={() => setModalOpen(false)}>
         <form onSubmit={handleCreateProjeto} className="flex flex-col gap-4">
           <div>
-            <label className="block text-sm font-medium text-slate-400 mb-1">Referência (ex: GS1522)</label>
-            <input 
-              autoFocus
-              type="text" 
-              required
-              value={newProjRef}
-              onChange={e => setNewProjRef(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 text-slate-200 rounded-lg p-2.5 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none transition-all"
-            />
+            <label className="block text-sm font-medium text-slate-400 mb-1">Referência</label>
+            <div className="flex w-full items-center bg-slate-950 border border-slate-800 rounded-lg overflow-hidden transition-all focus-within:border-sky-500 focus-within:ring-1 focus-within:ring-sky-500">
+               <span className="bg-slate-900 border-r border-slate-800 text-slate-500 font-bold px-3 py-2.5 select-none">
+                 GS
+               </span>
+               <input 
+                 autoFocus
+                 type="text" 
+                 required
+                 placeholder="1522"
+                 value={newProjRef}
+                 onChange={e => setNewProjRef(e.target.value.replace(/[^0-9]/g, ''))}
+                 className="flex-1 bg-transparent text-slate-200 p-2.5 outline-none"
+               />
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-400 mb-1">Cliente (Opcional)</label>
@@ -190,7 +197,7 @@ export function Sidebar() {
       {/* HEADER da Sidebar - HUB */}
       <button 
         onClick={() => { setArchiveMode(false); useAppStore.getState().setSelectedProject(null); }}
-        className="p-4 border-b border-slate-800 flex items-center gap-3 w-full text-left hover:bg-slate-800/30 transition-colors group cursor-pointer"
+        className="p-4 border-b border-slate-800 flex items-center gap-3 w-full text-left hover:bg-slate-800/30 transition-colors group cursor-pointer shrink-0"
         title="Voltar ao HUB Global"
       >
         <div className="w-8 h-8 rounded bg-sky-500/10 flex items-center justify-center border border-sky-500/20 group-hover:bg-sky-500/20 transition-colors">
@@ -201,6 +208,18 @@ export function Sidebar() {
           <p className="text-[10px] text-sky-500/70 group-hover:text-sky-400 uppercase tracking-wider font-medium transition-colors">Ir para o HUB Principal</p>
         </div>
       </button>
+
+      {/* Global Search Bar Trigger */}
+      <div className="px-4 py-3 border-b border-slate-800 shrink-0">
+        <button 
+           onClick={() => useAppStore.getState().setSearchOpen(true)}
+           className="w-full flex items-center gap-2 bg-slate-950 border border-slate-800 hover:border-sky-500/50 transition-colors text-slate-400 hover:text-slate-200 rounded-lg p-2.5 text-sm outline-none group"
+        >
+          <Search size={16} className="group-hover:text-sky-400 transition-colors shrink-0" />
+          <span className="flex-1 text-left text-[13px]">Pesquisa Suprema...</span>
+          <span className="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded text-slate-500 font-medium tracking-widest shrink-0 hidden lg:block">CMD+K</span>
+        </button>
+      </div>
 
       {/* Lista de Projetos (Nav) */}
       <div className="flex-1 overflow-y-auto p-3 p-b-20">

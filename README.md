@@ -1,46 +1,51 @@
-# Nexar
-
-Aplicação de arquitetura híbrida (Desenvolvida em Tauri + React) para controlo, monitorização e gestão global de Produção de Fábrica.
-Criada para otimizar os ecrãs dispersos de estaleiro e organizar Obras e O.F.s num ambiente Premium e focado puramente em UX/UI tátil e percetível de alto contraste.
-
-## Funcionalidades Principais
-* **Gestão Multinível:** Camadas isoladas de (Projetos Mestre -> Ordens de Fabrico -> Tarefas Departamentais).
-* **Base de Dados Assíncrona:** Integrado com Motor Supabase (PostgresSQL) para acesso de base de dados escalável e global.
-* **Exportações Flexíveis:** Exportação massiva em formatos JSON e relatórios XLSX (Excel) moldados à medida.
-* **Segurança e Prevenção:** Modais anti-erro customizados (eliminações dependentes de _Match_ literal de texto e Barras de Progresso de confirmação forçada em 2 Segundos em processos de fecho).
-* **Analytics Color-Coded:** Identificação visual imaculada das O.F.s, seja por Cores Semânticas de % de Fecho, seja pela data de passividade dos projetos (>14 dias Alertas Amarelos, >21 Dias vermelhos).
-* **Sweeper Automático:** Motor interno que em pano de fundo, analisa bases acabadas. Uma Obra 100% finalizada intocável por mais de 7 dias recolhe-se pacificamente para o Sistema Arquivo da App sem interferência humana.
+<div align="center">
+  <img src="https://img.icons8.com/?size=150&id=DREntqjQoW5N&format=png&color=000000" alt="Nexar Logo" width="80" />
+  <h1>Nexar HUB</h1>
+  <p><strong>Industrial Work Manager de Alta Performance</strong></p>
+</div>
 
 ---
 
-## Histórico de Fases de Desenvolvimento
+## 📌 Resumo da Aplicação
 
-Este projeto foi construído e trabalhado de forma modular:
+O **Nexar HUB** é uma aplicação híbrida de gestão industrial construída como aplicação de *Desktop* nativa macOS / Windows utilizando o poderoso motor **Tauri v2**.
+O sistema foi concebido para abolir o uso de folhas de Excel soltas nas fábricas. Proporciona um ambiente imaculado, sombrio (Dark Mode orgânico) e ultrarrápido para que os diretores de produção consigam monitorizar **Obras (Projetos Mestre)**, as respetivas **Ordens de Fabrico (O.F.s)** e cada um dos seus **Passos (Tarefas de Trabalho)** em tempo real.
 
-### Fase 1: Fundação
-* Setup do ecossistema base (Tauri v2 + React 18 + Vite).
-* Implementação do Design System via TailwindCSS.
-* Ligação e desenho estrutural na BD da Cloud "Supabase" (`projectos`, `ordens_fabrico` e `tarefas` ligadas por Foreign Keys).
-* Escrita dos serviços essenciais de CRUD.
-
-### Fase 2: Navegação e Interface
-* Programação da Sidebar Mestra e construção do layout adaptável.
-* Páginas de Acesso `OfView` (para a Gestão cirúrgica de checkboxes de cada Tarefa: Modelação, Montagem, Validação...).
-* Página de Projeto (`ProjectView`), com vista agregada e navegação fácil sem andar para trás e para a frente.
-* Extratores e Geradores de Excel nativos, escrevendo na Sheet e pintando as linhas de forma fluída e percetível.
-
-### Fase 3: HUB e Analytics de Topo
-* Substituição absoluta do vazio inicial por um **GlobalDashboard** em Grelha (*Masonry/Grid Dashboard*), que sumariza todo o motor industrial em cartões. O utilizador no arranque tem imediata perceção de onde investir a mão-de-obra.
-* Separação de estados "Ativo/Arquivo", filtragem global de informação para não poluir os gestores.
-* Refatoração massiva de títulos para garantir a hierarquia humana: Prioridade de Leitura aos nomes Cívis, colocando _Tags GSxxxx_ em segundo plano organizativo.
-* Injeção da ordenação cronometrada (*Obras Ativas mais antigas flutuam para o Topo dos painéis* para escoamento logístico prioritário).
-
-### Fase 4: O Refinamento Premium (Polishing)
-* Abandono total de componentes Web Nativops (Como `window.prompt` e `window.confirm`) a favor de componentes Gráficos **Modal** embebidos.
-* Animações ricas e _Hover States_ para evitar uma grelha mecânica morta.
-* Algoritmo de restauro (Tentativa de criação de obra antiga puxa automaticamente essa obra do lixo para as mãos do operador sem chatear).
-* **Scrollbars Black Custom** (As barras de Windows fundem-se no design Dark e evitam cortar o Flow Visual).
-* Criação de Seed Automático - Simulação com scripts locais criados para espalhar dezenas de Obras ao longo dum mês e testar os limites logísticos perante falhas temporais.
+O projeto assenta numa base de dados Cloud em **Supabase (PostgreSQL)**, permitindo aceder globalmente aos dados em segurança, enquanto mantém a fluidez visual imediata que se exigiria de um programa instalado localmente (*Offline-feel*).
 
 ---
-> **Tech Stack:** React, Tailwind CSS, TypeScript, Supabase, Lucide Icons, Xlsx, Tauri.
+
+## 🚀 Funcionalidades Chave (Core Features)
+
+- **🧩 Monitorização Global (Dashboard)**: O ecrã de entrada converte todas as métricas abertas num mosaico fluído de dados para percepção visual imediata, colocando para segundo as obras seladas ou passadas.
+- **🛡️ UX "Erro-Blindada"**: Utilização de Modais Interativos anti-erro humano. Ao invés do `alert` barato do browser nativo, a aplicação requer a digitação literal do número da obra para confirmar destruições, garantindo segurança na pressa logística industrial.
+- **⏱️ Motor de Auto-Arquivo Fantasma**: Varredura silenciosa (`auto-archival logic`). Se um Projeto detiver todas as suas O.F.s marcadas a 100% verde sem novidades por **7 dias seguidos**, ele desliza para o Lixo Histórico (Arquivo) sozinho, sem chatear o coordenador.
+- **🔍 Pesquisa "Command Palette" (CMD + K)**: Busca universal focada em produtividade. O ecrã escurece revelando apenas a linha logitudinal, pronta para sondar tanto Nomes de Clientes como Códigos de Ordens de Fabrico nas centenas de caixas disponíveis, saltando logo em fração de segundo.
+- **🗃️ Exportador "Dual-Engine" Automático**: Quando a aplicação nativa necessita de partilhar o processo com clientes externos ou engenheiros, dispõe da inteligência de gravar nativamente ficheiros compatíveis com Microsoft® Excel `.xlsx` ou Backup de sistema em `.json` perfeitamente estruturado, saltando as bolhas de segurança do ambiente Apple ou Windows utilizando o motor Fs do Rust.
+
+---
+
+## 🏗️ Fases de Desenvolvimento e Etapas de Produção
+
+Toda a arquitetura progrediu em escadas sólidas para evitar retrocessos e código residual ao longo dos ciclos. A tabela a seguir representa o plano percorrido para estabilizar o código à data atual:
+
+| Fase de Produção | Foco Arquitetural | Pontos Chaves & Definições Técnicas Implementadas |
+| :---------- | :--- | :--- |
+| **Fase 1: Fundação Backend** | Lógica de Ligações API & UI Esqueleto | • Setup inicial com `Tauri v2`, `React` + `Vite`<br>• Ligação estrutural ao Sistema SQL Global por chaves e políticas PKS<br>• Criação Base da *Sidebar* estática para visualização contínua. |
+| **Fase 2: Gestão Visual de Ciclo** | Escalabilidade de Navegação | • Criação das páginas separadas de `ProjectView` (*Visão Abstrata da Obra*) e `OfView` (*Checklist de fábrica para chão de produção*)<br>• Componentes auto-reativos que mudam de status dependendo do % da totalidade completada. |
+| **Fase 3: Analytics Inteligente** | Filtros e *Timeline* Sensorial | • Hub Global com "Cartões Mestre" das Obras.<br>• Alertas passivos integrados: Triângulos de Perigo coloridos caso o projeto arraste há mais de **2 ou 3 Semanas** nas docas da fábrica.<br>• Implementação pesada do script de Motor `runAutoArchive`. |
+| **Fase 4: Premium Polishing UI/UX**| *Command Palette* e Segurança Nativa | • *Hover States*, Cores "céu e âmbar" com reatividade imediata sem carregar e Scrollbars customizadas para não quebrar a identidade negra.<br>• Transformar *Prompts* de navegador em Dialogs de Mac nativo usando as livrarias de OS diretas no `exportUtils`.<br>• Janela Global Search à pressão duma telca invocando `ilike` na SQL BD. |
+
+---
+
+## 💻 Tech Stack Detalhado e Ferramentas
+
+- **Frontend Core**: React 18 / TypeScript
+- **Bundler & Build Tool**: Vite (Lightning Fast Hot Modules)
+- **Engine Desktop**: Tauri v2 Framework (Cargo/Rust) + `Fs/Dialog Plugins`
+- **Estilização Dinâmica**: Tailwind CSS (Abordagem Utility-First para responsividade modular)
+- **Gestão de Estado**: Zustand (Store Global)
+- **Sistema de Base de Dados**: Supabase SDK Cloud Architecture (C/ RLS rules baseadas em chaves locais).
+- **Icons & Extras**: Lucide React / SheetJs (Para serialização de Buffer para Excel).
+
+> **Nota de Segurança:** Por se tratar do ecossistema central de faturação e dados de fábrica, não expor sob pretexto nenhum o ficheiro `.env` associado às chaves anon da cloud de dados principal. As mesmas encontram-se isoladas com `gitignore` ativo.
