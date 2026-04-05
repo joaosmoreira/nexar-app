@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { fetchProjetos, fetchOfsByProjeto, createProjeto, fetchProjetosArquivados, Projeto, OrdemFabrico } from '../services/api';
-import { Folder, FileCog, Layers, Plus, Archive, AlertTriangle, CheckCircle2, Search } from 'lucide-react';
+import { Folder, FileCog, Layers, Plus, Archive, AlertTriangle, CheckCircle2, Search, LogOut, User } from 'lucide-react';
+import { supabase } from '../supabaseClient';
 import { cn } from '../lib/utils';
 import { Modal } from './Modal';
 
@@ -119,7 +120,7 @@ function OfItem({ ofData }: { ofData: OrdemFabrico }) {
 }
 
 export function Sidebar() {
-  const { isArchiveMode, setArchiveMode } = useAppStore();
+  const { isArchiveMode, setArchiveMode, user } = useAppStore();
   const [projetos, setProjetos] = useState<Projeto[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -261,7 +262,7 @@ export function Sidebar() {
         )}
       </div>
 
-      <div className="p-4 border-t border-slate-800 mt-auto bg-slate-900 z-10">
+      <div className="p-4 border-t border-slate-800 mt-auto bg-slate-900 z-10 flex flex-col gap-2">
         <button 
           onClick={() => setArchiveMode(!isArchiveMode)}
           className={cn(
@@ -274,6 +275,25 @@ export function Sidebar() {
           <Archive size={16} />
           {isArchiveMode ? "Voltar ao Dashboard" : "Ver Arquivo"}
         </button>
+
+        <div className="flex items-center justify-between bg-slate-950 border border-slate-800 p-2.5 rounded-lg mt-1">
+           <div className="flex items-center gap-2 overflow-hidden">
+              <div className="w-8 h-8 bg-sky-500/10 border border-sky-500/20 text-sky-400 rounded flex items-center justify-center shrink-0">
+                 <User size={16} />
+              </div>
+              <div className="text-xs truncate text-slate-300">
+                 <div className="truncate font-medium">{user?.user_metadata?.full_name || 'Utilizador'}</div>
+                 <div className="truncate text-[10px] text-slate-500">{user?.email}</div>
+              </div>
+           </div>
+           <button 
+             onClick={() => supabase.auth.signOut()}
+             className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
+             title="Terminar Sessão"
+           >
+             <LogOut size={16} />
+           </button>
+        </div>
       </div>
 
     </aside>
