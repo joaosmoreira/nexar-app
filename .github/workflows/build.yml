@@ -12,7 +12,7 @@ jobs:
       matrix:
         platform: [macos-latest, windows-latest]
     runs-on: ${{ matrix.platform }}
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -32,9 +32,26 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Variáveis Supabase (adicionar como GitHub Secrets no repositório)
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          # Assinatura ad-hoc para macOS (evita o erro "app danificada" do Gatekeeper)
+          # O utilizador pode precisar de: clique direito → Abrir (na primeira vez)
+          APPLE_SIGNING_IDENTITY: ${{ matrix.platform == 'macos-latest' && '-' || '' }}
         with:
           tagName: v__VERSION__
           releaseName: 'App v__VERSION__'
           releaseBody: 'Uma nova versão do Nexar Work Manager (Windows e macOS).'
           releaseDraft: false
           prerelease: false
+
+      # Remove o atributo de quarentena do DMG gerado (macOS apenas)
+      # Isto evita que o Gatekeeper bloqueie o instalador ao fazer download
+      - name: Remove macOS quarantine flag
+        if: matrix.platform == 'macos-latest'
+        run: |
+          DMG=$(find src-tauri/target/release/bundle/dmg -name "*.dmg" | head -1)
+          if [ -n "$DMG" ]; then
+            xattr -cr "$DMG"
+            echo "Quarantine removida de: $DMG"
+          fi
