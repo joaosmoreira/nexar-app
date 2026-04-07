@@ -32,26 +32,63 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Variáveis Supabase (adicionar como GitHub Secrets no repositório)
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          # Assinatura ad-hoc para macOS (evita o erro "app danificada" do Gatekeeper)
-          # O utilizador pode precisar de: clique direito → Abrir (na primeira vez)
           APPLE_SIGNING_IDENTITY: ${{ matrix.platform == 'macos-latest' && '-' || '' }}
         with:
           tagName: v__VERSION__
-          releaseName: 'App v__VERSION__'
+          releaseName: 'Nexar v__VERSION__'
           releaseBody: 'Uma nova versão do Nexar Work Manager (Windows e macOS).'
           releaseDraft: false
           prerelease: false
 
-      # Remove o atributo de quarentena do DMG gerado (macOS apenas)
-      # Isto evita que o Gatekeeper bloqueie o instalador ao fazer download
-      - name: Remove macOS quarantine flag
+      # Assinatura ad-hoc recursiva profunda (macOS)
+      # O tauri-action assina apenas o binário principal.
+      # Este passo assina TODOS os frameworks e libraries embebidos,
+      # que é o que o Gatekeeper verifica antes de permitir a execução.
+      - name: Deep ad-hoc sign macOS app
         if: matrix.platform == 'macos-latest'
         run: |
+          APP=$(find src-tauri/target/release/bundle/macos -name "*.app" | head -1)
+          echo "A assinar recursivamente: $APP"
+          # Remove assinaturas anteriores e faz deep sign
+          find "$APP" -type f \( -name "*.dylib" -o -name "*.so" -o -perm +0111 \) | while read f; do
+            codesign --force --sign - "$f" 2>/dev/null || true
+          done
+          # Assina o bundle completo em modo deep
+          codesign --force --deep --sign - "$APP"
+          echo "Assinatura concluída."
+          codesign --verify --deep --strict "$APP" && echo "✅ Verificação OK" || echo "⚠️ Verificação falhou"
+
+      # Reempacota o DMG com a app assinada + script de instalação
+      - name: Repackage DMG with signed app
+        if: matrix.platform == 'macos-latest'
+        run: |
+          APP=$(find src-tauri/target/release/bundle/macos -name "*.app" | head -1)
           DMG=$(find src-tauri/target/release/bundle/dmg -name "*.dmg" | head -1)
-          if [ -n "$DMG" ]; then
-            xattr -cr "$DMG"
-            echo "Quarantine removida de: $DMG"
-          fi
+          TMP_DIR=$(mktemp -d)
+
+          echo "A reempacotar DMG com app assinada + script de instalação..."
+
+          # Pasta staging com app + script
+          mkdir -p "$TMP_DIR/staging"
+          cp -R "$APP" "$TMP_DIR/staging/"
+
+          # Incluir script de instalação (faz xattr -cr automaticamente)
+          cp scripts/install-mac.command "$TMP_DIR/staging/📦 Instalar Nexar.command"
+          chmod +x "$TMP_DIR/staging/📦 Instalar Nexar.command"
+
+          # Criar novo DMG
+          hdiutil create -volname "Nexar HUB" -srcfolder "$TMP_DIR/staging" -ov -format UDZO "$DMG"
+
+          rm -rf "$TMP_DIR"
+          echo "✅ DMG reempacotado com script de instalação"
+
+      - name: Upload signed DMG to release
+        if: matrix.platform == 'macos-latest'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }}
+          files: src-tauri/target/release/bundle/dmg/*.dmg
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
