@@ -60,7 +60,7 @@ jobs:
           echo "Assinatura concluída."
           codesign --verify --deep --strict "$APP" && echo "✅ Verificação OK" || echo "⚠️ Verificação falhou"
 
-      # Reempacota o DMG com a app assinada + script de instalação
+      # Reempacota o DMG com a app já assinada corretamente
       - name: Repackage DMG with signed app
         if: matrix.platform == 'macos-latest'
         run: |
@@ -68,21 +68,13 @@ jobs:
           DMG=$(find src-tauri/target/release/bundle/dmg -name "*.dmg" | head -1)
           TMP_DIR=$(mktemp -d)
 
-          echo "A reempacotar DMG com app assinada + script de instalação..."
-
-          # Pasta staging com app + script
+          echo "A reempacotar DMG com app assinada..."
           mkdir -p "$TMP_DIR/staging"
           cp -R "$APP" "$TMP_DIR/staging/"
-
-          # Incluir script de instalação (faz xattr -cr automaticamente)
-          cp scripts/install-mac.command "$TMP_DIR/staging/📦 Instalar Nexar.command"
-          chmod +x "$TMP_DIR/staging/📦 Instalar Nexar.command"
-
-          # Criar novo DMG
           hdiutil create -volname "Nexar HUB" -srcfolder "$TMP_DIR/staging" -ov -format UDZO "$DMG"
 
           rm -rf "$TMP_DIR"
-          echo "✅ DMG reempacotado com script de instalação"
+          echo "✅ DMG reempacotado"
 
       - name: Upload signed DMG to release
         if: matrix.platform == 'macos-latest'

@@ -271,6 +271,39 @@ npm run dev
 
 ---
 
+## 🍎 Instalação no macOS (App distribuída)
+
+> [!IMPORTANT]
+> A app é distribuída com **assinatura ad-hoc** (sem Apple Developer Certificate pago).
+> O macOS Gatekeeper vai bloquear na primeira tentativa de abertura.
+> Segue **um** dos métodos abaixo para instalar:
+
+### Método 1 — System Settings (sem Terminal, recomendado)
+
+1. Faz duplo-clique na app → aparece o aviso da Apple
+2. Vai a **Definições do Sistema → Privacidade e Segurança**
+3. No fundo da página aparece: **"nexar-app foi bloqueada → Abrir Mesmo Assim"**
+4. Clica → introduz password → a app abre e fica permitida permanentemente
+
+### Método 2 — Terminal (1 comando, mais rápido)
+
+Depois de arrastar a app para `/Applications`, corre no Terminal:
+
+```bash
+xattr -rd com.apple.quarantine /Applications/nexar-app.app
+```
+
+Ou diretamente no DMG antes de instalar:
+
+```bash
+xattr -rd com.apple.quarantine ~/Downloads/nexar-app_*.dmg
+```
+
+> [!NOTE]
+> Este é o comportamento normal do macOS para apps distribuídas fora da App Store sem notarização Apple (€99/ano). Qualquer app industrial interna partilha esta limitação. O processo é feito **apenas uma vez por máquina**.
+
+---
+
 ## 🔒 Segurança
 
 > **IMPORTANTE:** O ficheiro `.env` contém as chaves da cloud e está incluído no `.gitignore`. **Nunca commitar este ficheiro.** As chaves permitem acesso à base de dados de produção.
