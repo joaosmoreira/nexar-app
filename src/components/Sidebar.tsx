@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { fetchProjetos, fetchOfsByProjeto, createProjeto, fetchProjetosArquivados, Projeto, OrdemFabrico } from '../services/api';
-import { Folder, FileCog, Layers, Plus, Archive, AlertTriangle, CheckCircle2, Search, LogOut, User } from 'lucide-react';
+import { Folder, FileCog, Layers, Plus, Archive, AlertTriangle, CheckCircle2, Search, LogOut, User, Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { cn } from '../lib/utils';
 import { Modal } from './Modal';
@@ -120,7 +120,7 @@ function OfItem({ ofData }: { ofData: OrdemFabrico }) {
 }
 
 export function Sidebar() {
-  const { isArchiveMode, setArchiveMode, user } = useAppStore();
+  const { isArchiveMode, setArchiveMode, user, isOnline, isSyncing, lastSyncAt, hasPendingMutations } = useAppStore();
   const [projetos, setProjetos] = useState<Projeto[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -263,6 +263,35 @@ export function Sidebar() {
       </div>
 
       <div className="p-4 border-t border-slate-800 mt-auto bg-slate-900 z-10 flex flex-col gap-2">
+        {/* Connectivity status indicator */}
+        <div className={cn(
+          "flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-medium transition-all",
+          isSyncing
+            ? "bg-amber-500/10 border-amber-500/30 text-amber-400"
+            : isOnline
+              ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+              : "bg-red-500/10 border-red-500/30 text-red-400"
+        )}>
+          {isSyncing ? (
+            <RefreshCw size={12} className="animate-spin shrink-0" />
+          ) : isOnline ? (
+            <Wifi size={12} className="shrink-0" />
+          ) : (
+            <WifiOff size={12} className="shrink-0" />
+          )}
+          <span className="truncate">
+            {isSyncing
+              ? 'A sincronizar...'
+              : isOnline
+                ? lastSyncAt
+                  ? `Sincronizado · ${new Date(lastSyncAt).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}`
+                  : 'Online'
+                : hasPendingMutations
+                  ? 'Offline · Alterações pendentes'
+                  : 'Offline · Cache local'
+            }
+          </span>
+        </div>
         <button 
           onClick={() => setArchiveMode(!isArchiveMode)}
           className={cn(
