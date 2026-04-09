@@ -50,7 +50,7 @@ export function GlobalDashboard() {
            <span className="text-lg font-medium">Nenhum projeto encontrado.</span>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {metrics.map(projeto => {
              let abertas = 0;
              let concluido = 0;
@@ -83,7 +83,7 @@ export function GlobalDashboard() {
                        <div className="text-xs font-bold tracking-widest uppercase text-sky-500/70 mb-1" title={ref}>
                           {ref}
                        </div>
-                       <h2 className="text-xl font-bold text-slate-200 group-hover:text-white transition-colors truncate" title={projNameOnly}>
+                       <h2 className="text-xl font-bold text-slate-200 group-hover:text-white transition-colors line-clamp-2 leading-snug min-h-[3.5rem]" title={projNameOnly}>
                           {projNameOnly}
                        </h2>
                     </div>
