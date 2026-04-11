@@ -319,6 +319,25 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
         />
       </div>
 
+      {/* COMPILAÇÃO DAS NOTAS DAS OFS (READ-ONLY) */}
+      {ofs.some(of => of.notas && of.notas.trim() !== '') && (
+        <div className="mb-8">
+          <label className="block text-sm font-medium text-slate-400 mb-3">
+            Notas partilhadas nas Ordens de Fabrico
+          </label>
+          <div className="grid gap-3 select-text">
+            {ofs.filter(of => of.notas && of.notas.trim() !== '').map(of => (
+              <div key={of.id} className="bg-slate-800/20 border border-slate-700/50 rounded-lg p-4">
+                <div className="text-xs font-bold text-sky-400 mb-2 uppercase tracking-wide">
+                  OF {of.numero_of} <span className="text-slate-500 normal-case font-medium tracking-normal ml-1">— {of.nome_of}</span>
+                </div>
+                <div className="text-sm text-slate-300 font-light whitespace-pre-wrap leading-relaxed">{of.notas}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* TABLE */}
       <div className="bg-slate-800/30 border border-slate-700 rounded-2xl overflow-hidden">
         <div className="p-5 border-b border-slate-700/50 flex justify-between items-center bg-slate-800/50">

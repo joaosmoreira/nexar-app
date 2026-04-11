@@ -150,6 +150,8 @@ export function OfView({ ofId }: { ofId: number }) {
   const [editingOfName, setEditingOfName] = useState(false);
   const [editOfValue, setEditOfValue] = useState('');
   const [activeId, setActiveId] = useState<number | null>(null);
+  const [notas, setNotas] = useState('');
+  const [initialNotas, setInitialNotas] = useState('');
   const ofNameInputRef = useRef<HTMLInputElement>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
@@ -161,7 +163,12 @@ export function OfView({ ofId }: { ofId: number }) {
       .select('*, projectos(nome)')
       .eq('id', ofId)
       .single();
-    if (oData) { setOfData(oData as OrdemFabrico); setProjectName((oData as any).projectos?.nome || ''); }
+    if (oData) { 
+      setOfData(oData as OrdemFabrico); 
+      setProjectName((oData as any).projectos?.nome || ''); 
+      setNotas((oData as any).notas || '');
+      setInitialNotas((oData as any).notas || '');
+    }
     const tData = await fetchTarefasByOf(ofId);
     setTarefas(tData);
     setLoading(false);
@@ -200,6 +207,17 @@ export function OfView({ ofId }: { ofId: number }) {
       try { await updateOrdemFabrico(ofData.id, { nome_of: trimmed }); } catch (e: any) { alert('Erro: ' + e.message); loadData(); }
     }
     setEditingOfName(false);
+  };
+
+  const handleBlurNotas = async () => {
+    if (notas !== initialNotas && ofData) {
+      try {
+        await updateOrdemFabrico(ofId, { notas });
+        setInitialNotas(notas);
+      } catch (e: any) {
+        alert("Erro ao guardar notas: " + e.message);
+      }
+    }
   };
 
   const handleDragStart = (event: DragStartEvent) => setActiveId(event.active.id as number);
@@ -351,6 +369,20 @@ export function OfView({ ofId }: { ofId: number }) {
         <div className="w-full bg-slate-900 rounded-full h-3 border border-slate-700 flex items-center overflow-hidden">
           <div className="h-full bg-gradient-to-r from-sky-500 to-sky-400 transition-all duration-1000 ease-out" style={{ width: `${progresso}%` }} />
         </div>
+      </div>
+
+      {/* NOTAS DA OF */}
+      <div className="mb-8">
+        <label className="block text-sm font-medium text-slate-400 mb-2">
+          Notas / Detalhes de Produção
+        </label>
+        <textarea
+          value={notas}
+          onChange={e => setNotas(e.target.value)}
+          onBlur={handleBlurNotas}
+          placeholder="Adicione referências cruzadas, perigos, ou detalhes exclusivos desta Ordem de Fabrico..."
+          className="w-full bg-slate-800/30 border border-slate-700 text-slate-200 rounded-xl p-4 min-h-[100px] focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 transition-all resize-y"
+        />
       </div>
 
       {/* TASK LIST */}

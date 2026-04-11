@@ -25,6 +25,7 @@ export interface OrdemFabrico {
   status: string;
   criado_em: string;
   tarefas?: { concluido: boolean }[];
+  notas?: string;
 }
 
 export interface Tarefa {
@@ -352,7 +353,7 @@ export async function createTarefa(ordemId: number, nomeTarefa: string, index: n
   }
 }
 
-export async function updateOrdemFabrico(ofId: number, fields: { nome_of?: string; numero_of?: string }) {
+export async function updateOrdemFabrico(ofId: number, fields: { nome_of?: string; numero_of?: string; notas?: string }) {
   if (isOnline()) {
     await updateOrdemFabricoRemote(ofId, fields);
   } else {
@@ -530,7 +531,7 @@ export async function createTarefaRemote(ordemId: number, nomeTarefa: string, in
   return data as Tarefa;
 }
 
-export async function updateOrdemFabricoRemote(ofId: number, fields: { nome_of?: string; numero_of?: string }) {
+export async function updateOrdemFabricoRemote(ofId: number, fields: { nome_of?: string; numero_of?: string; notas?: string }) {
   const { error } = await supabase.from('ordens_fabrico').update(fields).eq('id', ofId);
   if (error) throw error;
 }

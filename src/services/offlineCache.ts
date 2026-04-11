@@ -23,7 +23,7 @@ export type MutationAction =
   | { action: 'deleteOF';        ofId: number }
   | { action: 'createTarefa';    tempId: number; ordemId: number; nome: string; index: number }
   | { action: 'updateUltimoMovimento'; projetoId: number }
-  | { action: 'updateOF'; ofId: number; fields: { nome_of?: string; numero_of?: string } }
+  | { action: 'updateOF'; ofId: number; fields: { nome_of?: string; numero_of?: string; notas?: string } }
   | { action: 'updateTarefa'; tarefaId: number; nome: string }
   | { action: 'deleteTarefa'; tarefaId: number }
   | { action: 'reorderTarefas'; tarefas: { id: number; ordem_index: number }[] }
@@ -130,7 +130,7 @@ export interface RemoteApi {
   deleteOrdemFabricoRemote: (id: number) => Promise<void>;
   createTarefaRemote: (ordemId: number, nome: string, index: number) => Promise<any>;
   updateProjectoUltimoMovimentoRemote: (id: number) => Promise<void>;
-  updateOrdemFabricoRemote?: (ofId: number, fields: { nome_of?: string; numero_of?: string }) => Promise<void>;
+  updateOrdemFabricoRemote?: (ofId: number, fields: { nome_of?: string; numero_of?: string; notas?: string }) => Promise<void>;
   updateTarefaRemote?: (tarefaId: number, nome: string) => Promise<void>;
   deleteTarefaRemote?: (tarefaId: number) => Promise<void>;
   reorderTarefasRemote?: (tarefas: { id: number; ordem_index: number }[]) => Promise<void>;
