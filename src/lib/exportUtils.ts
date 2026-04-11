@@ -12,7 +12,7 @@ export const exportProjectExcelWithTasks = async (projetoNome: string, cliente: 
 
   // Iterar pelas OFs
   for (const ofData of ofs) {
-    data.push(["O.F.", `${ofData.numero_of} - ${ofData.nome_of}`]);
+    data.push(["OF", `${ofData.numero_of} - ${ofData.nome_of}`]);
     
     // Sort logic to make sure standard tasks come in order if needed
     const tarefas = Array.isArray(ofData.tarefas) ? [...ofData.tarefas] : [];

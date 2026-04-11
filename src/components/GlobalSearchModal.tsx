@@ -58,7 +58,7 @@ export function GlobalSearchModal() {
           <input 
             autoFocus
             type="text" 
-            placeholder="Procure por GS1522, Lógica de Fachada, ou Número de O.F..."
+            placeholder="Procure por GS1522, Lógica de Fachada, ou Número de OF..."
             className="flex-1 bg-transparent text-slate-200 text-lg outline-none placeholder:text-slate-500"
             value={term}
             onChange={(e) => setTerm(e.target.value)}

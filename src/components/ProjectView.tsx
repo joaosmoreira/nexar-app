@@ -227,7 +227,7 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
       <Modal isOpen={modalOpen} title="Nova Ordem de Fabrico" onClose={() => setModalOpen(false)}>
         <form onSubmit={submitOf} className="flex flex-col gap-4">
           <div>
-            <label className="block text-sm font-medium text-slate-400 mb-1">Número da O.F.</label>
+            <label className="block text-sm font-medium text-slate-400 mb-1">Número da OF</label>
             <input 
               autoFocus
               type="text" 
@@ -239,7 +239,7 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-400 mb-1">Nome/Descrição da O.F.</label>
+            <label className="block text-sm font-medium text-slate-400 mb-1">Nome/Descrição da OF</label>
             <input 
               type="text" 
               required
@@ -330,7 +330,7 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
               className="flex items-center gap-2 px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
             >
               <PlusCircle size={16} />
-              Nova O.F.
+              Nova OF
             </button>
           )}
         </div>
@@ -343,7 +343,7 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
           <table className="w-full text-left text-sm text-slate-300">
             <thead className="text-xs uppercase bg-slate-900/50 text-slate-400 font-medium tracking-wider">
               <tr>
-                <th className="px-6 py-4">Nº O.F.</th>
+                <th className="px-6 py-4">Nº OF</th>
                 <th className="px-6 py-4">Nome</th>
                 <th className="px-6 py-4">Data</th>
                 <th className="px-6 py-4">Progresso Geral</th>

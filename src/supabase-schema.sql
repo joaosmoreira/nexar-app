@@ -1,25 +1,14 @@
 -- ══════════════════════════════════════════════════════════════════════
---  NEXAR HUB — Schema Supabase Completo
---  Versão: 2.0 (com Auth Multi-Utilizador + RLS)
+--  NEXAR HUB — Schema Supabase Completo (Modo NÃO-DESTRUTIVO)
+--  Versão: 2.1 (com Auth Multi-Utilizador, RLS + Informações Gerais)
 --  Executar no painel: Supabase Dashboard > SQL Editor
 -- ══════════════════════════════════════════════════════════════════════
 
 -- ─────────────────────────────────────────────────────────────────────
---  PASSO 1 — Limpar tabelas existentes (manter a ordem por causa das FKs)
--- ─────────────────────────────────────────────────────────────────────
-DROP TABLE IF EXISTS public.tarefas;
-DROP TABLE IF EXISTS public.ordens_fabrico;
-DROP TABLE IF EXISTS public.projectos;
-
--- ─────────────────────────────────────────────────────────────────────
---  PASSO 2 — Criar tabelas com isolamento por utilizador (user_id)
---
---  Cada registo pertence ao utilizador que o criou.
---  O campo `user_id` é preenchido automaticamente pelo Supabase Auth
---  via `auth.uid()`. Nenhum utilizador consegue ver dados de outro.
+--  PASSO 1 — Criar tabelas caso não existam (Seguro: Não apaga dados)
 -- ─────────────────────────────────────────────────────────────────────
 
-CREATE TABLE public.projectos (
+CREATE TABLE IF NOT EXISTS public.projectos (
   id              bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   user_id         uuid REFERENCES auth.users(id) DEFAULT auth.uid() NOT NULL,
   nome            text NOT NULL,
@@ -29,7 +18,10 @@ CREATE TABLE public.projectos (
   criado_em       timestamp with time zone DEFAULT now()
 );
 
-CREATE TABLE public.ordens_fabrico (
+-- Assegura que a coluna "informacoes_gerais" existe sempre na tabela
+ALTER TABLE public.projectos ADD COLUMN IF NOT EXISTS informacoes_gerais text;
+
+CREATE TABLE IF NOT EXISTS public.ordens_fabrico (
   id          bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   user_id     uuid REFERENCES auth.users(id) DEFAULT auth.uid() NOT NULL,
   projeto_id  bigint REFERENCES public.projectos(id) ON DELETE CASCADE NOT NULL,
@@ -39,7 +31,7 @@ CREATE TABLE public.ordens_fabrico (
   criado_em   timestamp with time zone DEFAULT now()
 );
 
-CREATE TABLE public.tarefas (
+CREATE TABLE IF NOT EXISTS public.tarefas (
   id          bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   user_id     uuid REFERENCES auth.users(id) DEFAULT auth.uid() NOT NULL,
   ordem_id    bigint REFERENCES public.ordens_fabrico(id) ON DELETE CASCADE NOT NULL,
@@ -49,49 +41,45 @@ CREATE TABLE public.tarefas (
 );
 
 -- ─────────────────────────────────────────────────────────────────────
---  PASSO 3 — Ativar Row Level Security (RLS) em todas as tabelas
---
---  Sem RLS ativo, qualquer utilizador autenticado podia ler todos os dados.
---  Com RLS, cada linha só é acessível ao seu dono.
+--  PASSO 2 — Ativar Row Level Security (RLS) em todas as tabelas
 -- ─────────────────────────────────────────────────────────────────────
 ALTER TABLE public.projectos        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ordens_fabrico   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tarefas          ENABLE ROW LEVEL SECURITY;
 
 -- ─────────────────────────────────────────────────────────────────────
---  PASSO 4 — Políticas de acesso (um utilizador só gere os seus dados)
+--  PASSO 3 — Políticas de acesso (um utilizador só gere os seus dados)
+-- 
+--  (Usa o bloco genérico DO para evitar erros se a política já existir)
 -- ─────────────────────────────────────────────────────────────────────
+DO $$ 
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Utilizador só pode gerir os seus Projetos' AND tablename = 'projectos') THEN
+    CREATE POLICY "Utilizador só pode gerir os seus Projetos" ON public.projectos FOR ALL USING (auth.uid() = user_id);
+  END IF;
 
--- Projetos: CRUD restrito ao criador
-CREATE POLICY "Utilizador só pode gerir os seus Projetos"
-  ON public.projectos
-  FOR ALL
-  USING (auth.uid() = user_id);
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Utilizador só pode gerir as suas Ordens' AND tablename = 'ordens_fabrico') THEN
+    CREATE POLICY "Utilizador só pode gerir as suas Ordens" ON public.ordens_fabrico FOR ALL USING (auth.uid() = user_id);
+  END IF;
 
--- Ordens de Fabrico: CRUD restrito ao criador
-CREATE POLICY "Utilizador só pode gerir as suas Ordens"
-  ON public.ordens_fabrico
-  FOR ALL
-  USING (auth.uid() = user_id);
-
--- Tarefas: CRUD restrito ao criador
-CREATE POLICY "Utilizador só pode gerir as suas Tarefas"
-  ON public.tarefas
-  FOR ALL
-  USING (auth.uid() = user_id);
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Utilizador só pode gerir as suas Tarefas' AND tablename = 'tarefas') THEN
+    CREATE POLICY "Utilizador só pode gerir as suas Tarefas" ON public.tarefas FOR ALL USING (auth.uid() = user_id);
+  END IF;
+END $$;
 
 -- ══════════════════════════════════════════════════════════════════════
---  ESTRUTURA FINAL DAS TABELAS (Referência Rápida)
+--  ESTRUTURA FINAL DAS TABELAS (Referência Rápida Atualizada v2.1)
 -- ══════════════════════════════════════════════════════════════════════
 --
 --  projectos
---  ├── id              bigint PK
---  ├── user_id         uuid FK → auth.users (RLS)
---  ├── nome            text       ex: "GS1522 - Garsteel Escadas"
---  ├── cliente         text       ex: "Garsteel"
---  ├── arquivado       boolean    false = ativo, true = arquivado
---  ├── ultimo_movimento timestamp  atualizado em cada interação
---  └── criado_em       timestamp
+--  ├── id                 bigint PK
+--  ├── user_id            uuid FK → auth.users (RLS)
+--  ├── nome               text       ex: "GS1522 - Garsteel Escadas"
+--  ├── cliente            text       ex: "Garsteel"
+--  ├── arquivado          boolean    false = ativo, true = arquivado
+--  ├── informacoes_gerais text       [NOVO] notas da obra
+--  ├── ultimo_movimento   timestamp  atualizado em cada interação
+--  └── criado_em          timestamp
 --
 --  ordens_fabrico
 --  ├── id          bigint PK
@@ -109,12 +97,4 @@ CREATE POLICY "Utilizador só pode gerir as suas Tarefas"
 --  ├── nome_tarefa text       ex: "Modelação", "Fabrico", "Montagem"
 --  ├── concluido   boolean
 --  └── ordem_index int8       ordenação manual (0-5 pré-definidos)
---
---  Tarefas pré-definidas por OF (criadas automaticamente):
---    0 - Modelação
---    1 - Aprovisionamento Material
---    2 - Validação
---    3 - Fabrico
---    4 - Parafusaria
---    5 - Montagem
 -- ══════════════════════════════════════════════════════════════════════

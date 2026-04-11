@@ -236,7 +236,7 @@ export function OfView({ ofId }: { ofId: number }) {
     if (deleteInputName === ofData.numero_of) {
       try { await deleteOrdemFabrico(ofId); useAppStore.getState().setSelectedOf(null); }
       catch (e: any) { alert(e.message); }
-    } else { alert('O número inserido não corresponde com o da O.F. atual.'); }
+    } else { alert('O número inserido não corresponde com o da OF atual.'); }
   };
 
   if (loading) return <div className="p-8 text-slate-400">A carregar detalhes da OF...</div>;
@@ -252,7 +252,7 @@ export function OfView({ ofId }: { ofId: number }) {
       <Modal isOpen={deleteModalOpen} title="Apagar Ordem de Fabrico" onClose={() => setDeleteModalOpen(false)}>
         <form onSubmit={confirmApagar} className="flex flex-col gap-4">
           <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-lg text-sm">
-            <span className="font-bold">Segurança:</span> De certeza que deseja apagar a O.F.? Todas as ferramentas e passos serão anulados.
+            <span className="font-bold">Segurança:</span> De certeza que deseja apagar a OF? Todas as ferramentas e passos serão anulados.
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-400 mb-1">
@@ -290,7 +290,7 @@ export function OfView({ ofId }: { ofId: number }) {
             {projectName || 'PROJETO'}
           </button>
           <span className="text-slate-700 mx-2">/</span>
-          <span className="text-sky-400">O.F. {ofData.numero_of}</span>
+          <span className="text-sky-400">OF {ofData.numero_of}</span>
         </div>
 
         <div className="flex justify-between items-start">
@@ -322,7 +322,7 @@ export function OfView({ ofId }: { ofId: number }) {
           <div className="flex gap-2 shrink-0">
             <button onClick={() => { setDeleteModalOpen(true); setDeleteInputName(''); }}
               className="flex items-center gap-2 px-3 py-2 bg-red-600/10 text-red-500 hover:bg-red-600/20 text-sm font-medium rounded-lg transition-colors border border-red-500/20">
-              <Trash2 size={16} /> Apagar O.F.
+              <Trash2 size={16} /> Apagar
             </button>
             <div className="w-px bg-slate-700/50 mx-2" />
             <div className="relative group">
