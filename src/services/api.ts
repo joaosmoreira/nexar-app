@@ -335,6 +335,69 @@ export async function createTarefa(ordemId: number, nomeTarefa: string, index: n
   }
 }
 
+export async function updateOrdemFabrico(ofId: number, fields: { nome_of?: string; numero_of?: string }) {
+  if (isOnline()) {
+    await updateOrdemFabricoRemote(ofId, fields);
+  } else {
+    const cache = await readCache();
+    const ofsByProjeto = { ...(cache.ofsByProjeto || {}) };
+    for (const projId in ofsByProjeto) {
+      ofsByProjeto[projId] = ofsByProjeto[projId].map((of: any) =>
+        of.id === ofId ? { ...of, ...fields } : of
+      );
+    }
+    await patchCache({ ofsByProjeto });
+    await queueMutation({ action: 'updateOF', ofId, fields });
+  }
+}
+
+export async function updateTarefa(tarefaId: number, nomeTarefa: string) {
+  if (isOnline()) {
+    await updateTarefaRemote(tarefaId, nomeTarefa);
+  } else {
+    const cache = await readCache();
+    const tarefasByOf = { ...(cache.tarefasByOf || {}) };
+    for (const ofId in tarefasByOf) {
+      tarefasByOf[ofId] = tarefasByOf[ofId].map((t: any) =>
+        t.id === tarefaId ? { ...t, nome_tarefa: nomeTarefa } : t
+      );
+    }
+    await patchCache({ tarefasByOf });
+    await queueMutation({ action: 'updateTarefa', tarefaId, nome: nomeTarefa });
+  }
+}
+
+export async function deleteTarefa(tarefaId: number) {
+  if (isOnline()) {
+    await deleteTarefaRemote(tarefaId);
+  } else {
+    const cache = await readCache();
+    const tarefasByOf = { ...(cache.tarefasByOf || {}) };
+    for (const ofId in tarefasByOf) {
+      tarefasByOf[ofId] = tarefasByOf[ofId].filter((t: any) => t.id !== tarefaId);
+    }
+    await patchCache({ tarefasByOf });
+    await queueMutation({ action: 'deleteTarefa', tarefaId });
+  }
+}
+
+export async function reorderTarefas(tarefas: { id: number; ordem_index: number }[]) {
+  if (isOnline()) {
+    await reorderTarefasRemote(tarefas);
+  } else {
+    const cache = await readCache();
+    const tarefasByOf = { ...(cache.tarefasByOf || {}) };
+    const indexMap = new Map(tarefas.map(t => [t.id, t.ordem_index]));
+    for (const ofId in tarefasByOf) {
+      tarefasByOf[ofId] = tarefasByOf[ofId].map((t: any) =>
+        indexMap.has(t.id) ? { ...t, ordem_index: indexMap.get(t.id) } : t
+      );
+    }
+    await patchCache({ tarefasByOf });
+    await queueMutation({ action: 'reorderTarefas', tarefas });
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────
 //  FUNÇÕES REMOTE (chamadas diretas Supabase — usadas pelo flush)
 // ─────────────────────────────────────────────────────────────────
@@ -440,6 +503,30 @@ export async function createTarefaRemote(ordemId: number, nomeTarefa: string, in
     .single();
   if (error) throw error;
   return data as Tarefa;
+}
+
+export async function updateOrdemFabricoRemote(ofId: number, fields: { nome_of?: string; numero_of?: string }) {
+  const { error } = await supabase.from('ordens_fabrico').update(fields).eq('id', ofId);
+  if (error) throw error;
+}
+
+export async function updateTarefaRemote(tarefaId: number, nomeTarefa: string) {
+  const { error } = await supabase.from('tarefas').update({ nome_tarefa: nomeTarefa }).eq('id', tarefaId);
+  if (error) throw error;
+}
+
+export async function deleteTarefaRemote(tarefaId: number) {
+  const { error } = await supabase.from('tarefas').delete().eq('id', tarefaId);
+  if (error) throw error;
+}
+
+export async function reorderTarefasRemote(tarefas: { id: number; ordem_index: number }[]) {
+  // Batch update via Promise.all
+  await Promise.all(
+    tarefas.map(t =>
+      supabase.from('tarefas').update({ ordem_index: t.ordem_index }).eq('id', t.id)
+    )
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────

@@ -22,7 +22,11 @@ export type MutationAction =
   | { action: 'deleteProjeto';   projetoId: number }
   | { action: 'deleteOF';        ofId: number }
   | { action: 'createTarefa';    tempId: number; ordemId: number; nome: string; index: number }
-  | { action: 'updateUltimoMovimento'; projetoId: number };
+  | { action: 'updateUltimoMovimento'; projetoId: number }
+  | { action: 'updateOF'; ofId: number; fields: { nome_of?: string; numero_of?: string } }
+  | { action: 'updateTarefa'; tarefaId: number; nome: string }
+  | { action: 'deleteTarefa'; tarefaId: number }
+  | { action: 'reorderTarefas'; tarefas: { id: number; ordem_index: number }[] };
 
 interface PendingQueue {
   mutations: MutationAction[];
@@ -125,6 +129,10 @@ export interface RemoteApi {
   deleteOrdemFabricoRemote: (id: number) => Promise<void>;
   createTarefaRemote: (ordemId: number, nome: string, index: number) => Promise<any>;
   updateProjectoUltimoMovimentoRemote: (id: number) => Promise<void>;
+  updateOrdemFabricoRemote?: (ofId: number, fields: { nome_of?: string; numero_of?: string }) => Promise<void>;
+  updateTarefaRemote?: (tarefaId: number, nome: string) => Promise<void>;
+  deleteTarefaRemote?: (tarefaId: number) => Promise<void>;
+  reorderTarefasRemote?: (tarefas: { id: number; ordem_index: number }[]) => Promise<void>;
 }
 
 /**
@@ -202,6 +210,36 @@ export async function flushPendingMutations(api: RemoteApi): Promise<{ flushed: 
         case 'updateUltimoMovimento': {
           const realId = resolveId(mut.projetoId);
           await api.updateProjectoUltimoMovimentoRemote(realId);
+          flushed++;
+          break;
+        }
+
+        case 'updateOF': {
+          const realId = resolveId(mut.ofId);
+          if (api.updateOrdemFabricoRemote) await api.updateOrdemFabricoRemote(realId, mut.fields);
+          flushed++;
+          break;
+        }
+
+        case 'updateTarefa': {
+          const realId = resolveId(mut.tarefaId);
+          if (api.updateTarefaRemote) await api.updateTarefaRemote(realId, mut.nome);
+          flushed++;
+          break;
+        }
+
+        case 'deleteTarefa': {
+          const realId = resolveId(mut.tarefaId);
+          if (api.deleteTarefaRemote) await api.deleteTarefaRemote(realId);
+          flushed++;
+          break;
+        }
+
+        case 'reorderTarefas': {
+          if (api.reorderTarefasRemote) {
+            const translated = mut.tarefas.map(t => ({ id: resolveId(t.id), ordem_index: t.ordem_index }));
+            await api.reorderTarefasRemote(translated);
+          }
           flushed++;
           break;
         }
