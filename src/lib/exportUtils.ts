@@ -1,4 +1,6 @@
 import * as XLSX from 'xlsx';
+import { save } from '@tauri-apps/plugin-dialog';
+import { writeFile, writeTextFile } from '@tauri-apps/plugin-fs';
 
 const isTauri = () => '__TAURI_INTERNALS__' in window;
 
@@ -34,8 +36,6 @@ export const exportProjectExcelWithTasks = async (projetoNome: string, cliente: 
   XLSX.utils.book_append_sheet(workbook, worksheet, "Progresso Obras");
 
   if (isTauri()) {
-     const { save } = await import('@tauri-apps/plugin-dialog');
-     const { writeFile } = await import('@tauri-apps/plugin-fs');
      try {
        const filePath = await save({
          filters: [{ name: 'Excel Workbook', extensions: ['xlsx'] }],
@@ -58,8 +58,6 @@ export const exportToExcel = async (data: any[], filename: string) => {
   XLSX.utils.book_append_sheet(workbook, worksheet, "Folha1");
 
   if (isTauri()) {
-     const { save } = await import('@tauri-apps/plugin-dialog');
-     const { writeFile } = await import('@tauri-apps/plugin-fs');
      try {
        const filePath = await save({
          filters: [{ name: 'Excel Workbook', extensions: ['xlsx'] }],
@@ -77,8 +75,6 @@ export const exportToExcel = async (data: any[], filename: string) => {
 
 export const exportToJson = async (data: any[], filename: string) => {
   if (isTauri()) {
-     const { save } = await import('@tauri-apps/plugin-dialog');
-     const { writeTextFile } = await import('@tauri-apps/plugin-fs');
      try {
        const filePath = await save({
          filters: [{ name: 'JSON Document', extensions: ['json'] }],
