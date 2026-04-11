@@ -26,7 +26,8 @@ export type MutationAction =
   | { action: 'updateOF'; ofId: number; fields: { nome_of?: string; numero_of?: string } }
   | { action: 'updateTarefa'; tarefaId: number; nome: string }
   | { action: 'deleteTarefa'; tarefaId: number }
-  | { action: 'reorderTarefas'; tarefas: { id: number; ordem_index: number }[] };
+  | { action: 'reorderTarefas'; tarefas: { id: number; ordem_index: number }[] }
+  | { action: 'updateProjetoNotas'; projetoId: number; notas: string };
 
 interface PendingQueue {
   mutations: MutationAction[];
@@ -133,6 +134,7 @@ export interface RemoteApi {
   updateTarefaRemote?: (tarefaId: number, nome: string) => Promise<void>;
   deleteTarefaRemote?: (tarefaId: number) => Promise<void>;
   reorderTarefasRemote?: (tarefas: { id: number; ordem_index: number }[]) => Promise<void>;
+  updateProjetoNotasRemote?: (projetoId: number, notas: string) => Promise<void>;
 }
 
 /**
@@ -217,6 +219,13 @@ export async function flushPendingMutations(api: RemoteApi): Promise<{ flushed: 
         case 'updateOF': {
           const realId = resolveId(mut.ofId);
           if (api.updateOrdemFabricoRemote) await api.updateOrdemFabricoRemote(realId, mut.fields);
+          flushed++;
+          break;
+        }
+
+        case 'updateProjetoNotas': {
+          const realId = resolveId(mut.projetoId);
+          if (api.updateProjetoNotasRemote) await api.updateProjetoNotasRemote(realId, mut.notas);
           flushed++;
           break;
         }

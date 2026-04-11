@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { createOF, deleteProjeto, arquivarProjeto, Projeto, OrdemFabrico } from '../services/api';
+import { createOF, deleteProjeto, arquivarProjeto, updateProjetoNotas, Projeto, OrdemFabrico } from '../services/api';
 import { supabase } from '../supabaseClient';
 import { exportToJson, exportProjectExcelWithTasks } from '../lib/exportUtils';
 import { FileDown, PlusCircle, Archive, Trash2 } from 'lucide-react';
@@ -18,6 +18,8 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
   const [ofs, setOfs] = useState<OFWithProgress[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [notas, setNotas] = useState("");
+  const [initialNotas, setInitialNotas] = useState("");
 
   // Fetch Project & OFs with Tasks
   const loadData = async () => {
@@ -25,7 +27,11 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
     
     // 1. Get Project info
     const { data: projData } = await supabase.from('projectos').select('*').eq('id', projetoId).single();
-    if (projData) setProjeto(projData);
+    if (projData) {
+      setProjeto(projData);
+      setNotas(projData.informacoes_gerais || "");
+      setInitialNotas(projData.informacoes_gerais || "");
+    }
 
     // 2. Get OFs and their Tasks to calc progress
     const { data: ofData } = await supabase
@@ -146,6 +152,17 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
        alert("O texto inserido não coincide com o nome da obra. Tente novamente.");
     }
   }
+
+  const handleBlurNotas = async () => {
+    if (notas !== initialNotas && projeto) {
+      try {
+        await updateProjetoNotas(projeto.id, notas);
+        setInitialNotas(notas);
+      } catch (e: any) {
+        alert("Erro ao guardar notas: " + e.message);
+      }
+    }
+  };
 
   if (loading) return <div className="p-8 text-slate-400">A carregar projeto...</div>;
   if (!projeto) return <div className="p-8 text-slate-400">Projeto não encontrado.</div>;
@@ -285,6 +302,21 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
           <div className="text-sm text-slate-400 mb-1">OFs Concluídas</div>
           <div className="text-3xl font-light text-sky-400">{ofs.filter(o => o.progress === 100).length}</div>
         </div>
+      </div>
+
+      {/* NOTAS GERAIS */}
+      <div className="mb-8">
+        <label className="block text-sm font-medium text-slate-400 mb-2">
+          Informações Gerais
+        </label>
+        <textarea
+          value={notas}
+          onChange={e => setNotas(e.target.value)}
+          onBlur={handleBlurNotas}
+          disabled={projeto.arquivado}
+          placeholder="Insira aqui as notas, detalhes ou observações relevantes sobre esta obra..."
+          className="w-full bg-slate-800/30 border border-slate-700 text-slate-200 rounded-xl p-4 min-h-[120px] focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 transition-all resize-y disabled:opacity-50 disabled:cursor-not-allowed"
+        />
       </div>
 
       {/* TABLE */}

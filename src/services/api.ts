@@ -14,6 +14,7 @@ export interface Projeto {
   cliente: string;
   criado_em: string;
   arquivado?: boolean;
+  informacoes_gerais?: string;
 }
 
 export interface OrdemFabrico {
@@ -231,6 +232,22 @@ export async function updateProjectoUltimoMovimento(projetoId: number) {
   }
 }
 
+export async function updateProjetoNotas(projetoId: number, notas: string) {
+  if (isOnline()) {
+    await updateProjetoNotasRemote(projetoId, notas);
+  } else {
+    const cache = await readCache();
+    const projetos = (cache.projetos || []).map((p: any) =>
+      p.id === projetoId ? { ...p, informacoes_gerais: notas } : p
+    );
+    const arquivados = (cache.projetoArquivados || []).map((p: any) =>
+      p.id === projetoId ? { ...p, informacoes_gerais: notas } : p
+    );
+    await patchCache({ projetos, projetoArquivados: arquivados });
+    await queueMutation({ action: 'updateProjetoNotas', projetoId, notas });
+  }
+}
+
 export async function createOF(projetoId: number, nomeOf: string, numeroOf: string): Promise<OrdemFabrico> {
   if (isOnline()) {
     return createOFRemote(projetoId, nomeOf, numeroOf);
@@ -411,6 +428,14 @@ export async function updateProjectoUltimoMovimentoRemote(projetoId: number) {
   const { error } = await supabase
     .from('projectos')
     .update({ ultimo_movimento: new Date().toISOString() })
+    .eq('id', projetoId);
+  if (error) throw error;
+}
+
+export async function updateProjetoNotasRemote(projetoId: number, notas: string) {
+  const { error } = await supabase
+    .from('projectos')
+    .update({ informacoes_gerais: notas })
     .eq('id', projetoId);
   if (error) throw error;
 }
