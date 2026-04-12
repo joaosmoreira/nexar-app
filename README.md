@@ -19,7 +19,7 @@ O **Nexar HUB** é uma aplicação desktop nativa (macOS + Windows) de gestão i
 
 - **Obras / Projetos** — A entidade-mestre de cada encomenda de produção
 - **Ordens de Fabrico (O.F.s)** — As fases de execução dentro de cada Obra
-- **Tarefas de Trabalho** — Os 6 passos de produção de cada O.F. (Modelação → Montagem)
+- **Tarefas de Trabalho** — Os passos de produção de cada O.F., totalmente reordenáveis (Drag & Drop)
 
 Os dados são sincronizados em tempo real com a cloud via **Supabase (PostgreSQL)** quando há internet, e gravados localmente em cache quando offline.
 
@@ -32,32 +32,35 @@ Os dados são sincronizados em tempo real com a cloud via **Supabase (PostgreSQL
 - Cada utilizador vê **apenas os seus próprios dados** — os projetos de um utilizador são completamente invisíveis para outro
 - Isolamento garantido por **Row Level Security (RLS)** ao nível da base de dados
 
-### 📴 Modo Offline-First (novo)
+### 📴 Modo Offline-First
 - A app funciona **completamente sem internet**
 - Quando online: dados carregados do Supabase e guardados em cache local (`nexar-cache.json`) na pasta AppData do sistema
 - Quando offline: dados servidos do cache local — leitura e escrita funcionam normalmente
 - Escritas offline ficam em fila (`nexar-pending.json`) e são **sincronizadas automaticamente** ao voltar online
 - IDs temporários (negativos) são resolvidos para IDs reais do Supabase durante o flush
-- Indicador visual na Sidebar: 🟢 Online / 🟡 A sincronizar / 🔴 Offline
+
+### 📝 Ecossistema de Notas e Produtividade (Novo)
+- **Informações Gerais da Obra**: Bloco de anotações persistente e partilhado no sumário visual de cada projeto.
+- **Micro-Dossiê por OF**: Cada Ordem de Fabrico dispõe do seu próprio painel reservado de observações, que é lido também da página mãe para facilidade visual!
+- **Edição Inline**: Títulos das OFs e nomenclatura das tarefas podem ser ajustados ou apagados com um simples clique.
+- **Drag & Drop**: As tarefas da OF podem ser arrastadas e reordenadas manualmente sem perder sincronização ao base de dados.
 
 ### 🧩 Dashboard Global
-- Mosaico de cartões com todas as Obras ativas
+- Mosaico interativo de relance com todas as Obras
 - Progresso calculado em tempo real (% de tarefas concluídas)
-- Alertas visuais de atraso: ⚠️ âmbar (>14 dias) e 🔴 vermelho (>21 dias) sem movimento
+- Alertas visuais de atraso para priorização: ⚠️ âmbar (>14 dias) e 🔴 vermelho (>21 dias) inativas
 
 ### ⏱️ Motor de Auto-Arquivo
-- Varredura silenciosa: se um Projeto tem **todas as tarefas a 100%** e não tem atividade há **7 dias**, é arquivado automaticamente
-- Só corre quando online (lógica de escrita no Supabase)
+- Varredura silenciosa: se um Projeto cumpre todos os requisitos a 100% e não tem cliques há mais de **7 dias**, é arquivado debaixo do teu radar.
 
 ### 🔍 Pesquisa Global (CMD + K)
-- Command Palette em fullscreen com pesquisa em tempo real
-- Pesquisa por nome de cliente, referência de projeto e número de O.F.
-- Funciona offline (pesquisa no cache local)
+- Paleta global em fullscreen com indexação nativa
+- Pesquisa por strings híbridas de clientes, referência do projeto e número de O.F.
 
-### 📂 Exportador Dual-Engine
-- Exporta dados para **`.xlsx`** (Excel) ou **`.json`** (backup estruturado)
-- Dialogs nativos do sistema operativo via `@tauri-apps/plugin-dialog`
-- Escrita de ficheiro via `@tauri-apps/plugin-fs` sem restrições de sandbox
+### 📂 Exportador Dual-Engine Nativo
+- Processador de download direto de arrays para **`.xlsx`** (Excel) ou backup estrutural em **`.json`**.
+- Dialogs controlados pelo sistema operativo via `@tauri-apps/plugin-dialog`
+- Sistema estrito de FileSystem nativo resolvido e enquadrado com o motor de `ACL Rights` do ambiente restrito Apple!
 
 ---
 
@@ -66,11 +69,12 @@ Os dados são sincronizados em tempo real com a cloud via **Supabase (PostgreSQL
 | Fase | Foco | Destaques Técnicos |
 |:---|:---|:---|
 | **Fase 1 — Fundação** | Backend + UI base | Setup Tauri v2 + React + Vite; ligação Supabase; Sidebar estática |
-| **Fase 2 — Navegação** | Views dinâmicas | `ProjectView` (Obra) e `OfView` (Checklist de produção); roteamento por Zustand state |
-| **Fase 3 — Analytics** | Dashboard + Alertas | GlobalDashboard com cartões de métricas; alertas de atraso; `runAutoArchive` |
-| **Fase 4 — UI/UX Premium** | Command Palette + Export | `CMD+K` global search; exportação Excel/JSON com dialogs nativos; dark mode orgânico |
-| **Fase 5 — Auth Multi-User** | Isolamento de dados | Supabase Auth; RLS em todas as tabelas; ecrã de login; dados por utilizador |
-| **Fase 6 — Offline-First** | Cache + Sync | Cache JSON local; fila de mutações pendentes; flush automático; indicador de conectividade |
+| **Fase 2 — Navegação** | Views dinâmicas | `ProjectView` e `OfView`; roteamento por Zustand state |
+| **Fase 3 — Analytics** | Dashboard + Alertas | Mosaicos de métricas; Alertas de atraso; `runAutoArchive` |
+| **Fase 4 — UX Premium** | Search + Export | `CMD+K`; exportação com dialogs nativas Desktop |
+| **Fase 5 — Auth** | Isolamento de dados | Supabase Auth; RLS global; login e dados confinados por user |
+| **Fase 6 — Offline** | Cache + Sync | Leitura/Escrita offline nativa via JSON; Fila Sync e Temp IDs |
+| **Fase 7 — Produtividade**| Drag&Drop | Notas transversais (Obra vs OFs); DND-Kit de Tarefas; Fixes ACL Desktop |
 
 ---
 
@@ -84,149 +88,60 @@ Os dados são sincronizados em tempo real com a cloud via **Supabase (PostgreSQL
 | **Estilos** | Tailwind CSS | v4 |
 | **Estado Global** | Zustand | v5 |
 | **Base de Dados** | Supabase (PostgreSQL + Auth) | SDK v2 |
-| **Offline Cache** | `@tauri-apps/plugin-fs` | v2 |
+| **Offline Cache** | `@tauri-apps` FS Plugin | v2 |
 | **Ícones** | Lucide React | v1 |
 | **Excel Export** | SheetJS (xlsx) | v0.18 |
-
----
-
-## 📁 Estrutura do Projeto
-
-```
-work-manager/
-├── src/
-│   ├── components/
-│   │   ├── Auth.tsx              # Ecrã de login (Supabase Auth)
-│   │   ├── GlobalDashboard.tsx   # Dashboard principal com cartões
-│   │   ├── GlobalSearchModal.tsx # Command Palette (CMD+K)
-│   │   ├── Modal.tsx             # Modal reutilizável
-│   │   ├── OfView.tsx            # Vista detalhada de uma O.F.
-│   │   ├── ProjectView.tsx       # Vista de uma Obra (lista de OFs)
-│   │   └── Sidebar.tsx           # Navegação lateral + indicador offline
-│   ├── lib/
-│   │   ├── exportUtils.ts        # Exportação Excel/JSON via Tauri FS
-│   │   └── utils.ts              # Helpers (cn, etc.)
-│   ├── services/
-│   │   ├── api.ts                # CRUD completo (online + offline)
-│   │   └── offlineCache.ts       # Cache local JSON + fila de mutações
-│   ├── store/
-│   │   └── useAppStore.ts        # Estado global Zustand
-│   ├── supabase-schema.sql       # Schema completo da BD (único ficheiro)
-│   ├── supabaseClient.ts         # Inicialização do cliente Supabase
-│   ├── App.tsx                   # Root: auth, listeners online/offline
-│   └── main.tsx
-├── src-tauri/
-│   ├── src/
-│   │   └── main.rs               # Entry point Rust
-│   ├── capabilities/             # Permissões Tauri v2
-│   ├── tauri.conf.json           # Configuração da app (janela, bundle)
-│   └── Cargo.toml                # Dependências Rust
-├── .env                          # Chaves Supabase (NÃO commitar)
-├── .gitignore
-└── package.json
-```
+| **Drag & Drop** | `@dnd-kit` | v6 |
 
 ---
 
 ## 🗄️ Base de Dados (Supabase)
 
-O schema completo está em `src/supabase-schema.sql`. Para configurar uma nova instância:
+A estrutura completa está formatada dentro do `src/supabase-schema.sql`. O script foi otimizado para a Versão 2.1 e desenolvido de forma **Não-Destrutiva**.
 
-1. Criar projeto no [Supabase](https://supabase.com)
-2. Ir a **SQL Editor** e executar o conteúdo de `src/supabase-schema.sql`
-3. Copiar as chaves `URL` e `anon key` do painel **Project Settings → API**
-
-### Tabelas
+### Tabelas Estruturais
 
 ```
 projectos
-├── id              bigint PK (auto)
-├── user_id         uuid FK → auth.users  ← RLS: dono do registo
-├── nome            text    ex: "GS1522 - Garsteel Escadas"
-├── cliente         text    ex: "Garsteel"
-├── arquivado       boolean false = ativo | true = arquivado
-├── ultimo_movimento timestamp  atualizado em cada interação
-└── criado_em       timestamp
+├── id                 bigint PK (auto)
+├── user_id            uuid FK → auth.users
+├── nome               text
+├── cliente            text
+├── arquivado          boolean
+├── informacoes_gerais text       [Bloco amplo de notas da obra]
+├── ultimo_movimento   timestamp
+└── criado_em          timestamp
 
 ordens_fabrico
 ├── id          bigint PK
-├── user_id     uuid FK → auth.users       ← RLS
-├── projeto_id  bigint FK → projectos(id)  ON DELETE CASCADE
-├── nome_of     text    ex: "Estrutura Principal"
-├── numero_of   text    ex: "OF-2024-001"
-├── status      text    'pendente' | 'em_progresso' | 'concluido'
+├── user_id     uuid FK → auth.users
+├── projeto_id  bigint FK → projectos(id)
+├── nome_of     text
+├── numero_of   text
+├── notas       text       [Anotações técnicas exclusivas]
+├── status      text       'pendente' | 'em_progresso' | 'concluido'
 └── criado_em   timestamp
 
-tarefas  (6 criadas automaticamente por O.F.)
+tarefas
 ├── id          bigint PK
-├── user_id     uuid FK → auth.users            ← RLS
-├── ordem_id    bigint FK → ordens_fabrico(id)  ON DELETE CASCADE
-├── nome_tarefa text    (ver ordem abaixo)
+├── user_id     uuid FK → auth.users
+├── ordem_id    bigint FK → ordens_fabrico(id)
+├── nome_tarefa text
 ├── concluido   boolean
-└── ordem_index int8    (0 a 5)
+└── ordem_index int8       [Gere a posição orgânica na vista e Drag Drop]
 ```
-
-**Tarefas pré-definidas por O.F. (por ordem):**
-
-| Index | Tarefa |
-|:---:|:---|
-| 0 | Modelação |
-| 1 | Aprovisionamento Material |
-| 2 | Validação |
-| 3 | Fabrico |
-| 4 | Parafusaria |
-| 5 | Montagem |
 
 ### Isolamento de Dados (RLS)
 
-Cada tabela tem Row Level Security ativado com a política:
+Cada tabela está trancada por uma muralha de acesso através desta política:
 ```sql
 USING (auth.uid() = user_id)
 ```
-Isto garante que **um utilizador nunca acede a dados de outro**, mesmo que partilhem a mesma instância Supabase.
+Isto assegura que **um utilizador nunca acede a Obras ou Tarefas de outro colega**, mesmo que ambos acedam ao HUB pela mesma instância global de Supabase.
 
 ---
 
-## 📴 Sistema Offline-First
-
-### Como funciona
-
-```
-┌──────────╗     online?     ┌───────────────────────────────┐
-│  React UI ║ ─────────────▶ │         api.ts                │
-└──────────╝                 └─────────────┬─────────────────┘
-                                           │
-                         ┌─────────────────┴──────────────────┐
-                         │ Sim                                 │ Não
-                         ▼                                     ▼
-                  Supabase (fetch/write)            offlineCache.ts
-                         │                                     │
-                         ▼                                     ▼
-                  nexar-cache.json (save)         nexar-cache.json (read)
-                                                  nexar-pending.json (queue)
-
-Ao reconectar:
-  flushPendingMutations() → executa fila → resolve temp IDs → sync cache
-```
-
-### Ficheiros de cache (AppData do sistema)
-
-| Ficheiro | Conteúdo |
-|:---|:---|
-| `nexar-cache.json` | Snapshot completo dos dados (projetos, OFs, tarefas) |
-| `nexar-pending.json` | Fila de mutações feitas offline (ordenada, com IDs temporários) |
-
-**Localização:**
-- macOS: `~/Library/Application Support/com.ctk.nexar/`
-- Windows: `%APPDATA%\com.ctk.nexar\`
-
-### IDs Temporários
-
-Criações offline (Projeto ou O.F.) recebem IDs negativos temporários (ex: `-1`, `-2`). Ao sincronizar, o motor de flush resolve cada ID temporário para o ID real retornado pelo Supabase, atualizando as referências nas mutações subsequentes da fila.
-
----
-
-## ⚙️ Setup e Desenvolvimento
+## ⚙️ Setup e Construção
 
 ### Pré-requisitos
 
@@ -237,36 +152,26 @@ Criações offline (Projeto ou O.F.) recebem IDs negativos temporários (ex: `-1
 ### Instalação
 
 ```bash
-# 1. Clonar
+# 1. Clonar O Repositório
 git clone <repo-url>
 cd work-manager
 
-# 2. Instalar dependências
+# 2. Instalar dependências pesadas
 npm install
 
-# 3. Criar ficheiro de ambiente
+# 3. Criar a raiz de ambiente e ligar o Backend
 cp .env.example .env
-# Preencher VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY
+# Adicionar: VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY
 ```
 
-### Variáveis de Ambiente (`.env`)
-
-```env
-VITE_SUPABASE_URL=https://xxxxxxxxxxxx.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-```
-
-### Comandos
+### Comandos de Suporte
 
 ```bash
-# Desenvolvimento (hot-reload)
+# Correr o emulador interativo Browser/Tauri Window:
 npm run tauri dev
 
-# Build de produção
+# Exigir ao Desktop que coza a aplicação (.App, .Dmg, .Exe):
 npm run tauri build
-
-# Apenas frontend (sem Tauri)
-npm run dev
 ```
 
 ---
@@ -274,50 +179,30 @@ npm run dev
 ## 🍎 Instalação no macOS (App distribuída)
 
 > [!IMPORTANT]
-> A app é distribuída com **assinatura ad-hoc** (sem Apple Developer Certificate pago).
-> O macOS Gatekeeper vai bloquear na primeira tentativa de abertura.
-> Segue **um** dos métodos abaixo para instalar:
+> O executável gerado é assinado internamente de forma **ad-hoc** (não dispõe de Certificados Públicos Autorizados pela Mação). Significa que a app será apanhada pelas firewalls do Gatekeeper no primeiro e único arranque livre.
 
-### Método 1 — System Settings (sem Terminal, recomendado)
+### Método 1 — System Settings (Recomendado)
 
-1. Faz duplo-clique na app → aparece o aviso da Apple
-2. Vai a **Definições do Sistema → Privacidade e Segurança**
-3. No fundo da página aparece: **"nexar-app foi bloqueada → Abrir Mesmo Assim"**
-4. Clica → introduz password → a app abre e fica permitida permanentemente
+1. Abrir o pacote instalador do `.dmg`.
+2. Arrastar o logótipo amarelo `Nexar HUB` para os teus atalhos / pasta `Aplicações`.
+3. Clica para abrir → Vai saltar o protesto da macã "Não Autorizado!". Clica OK/Fechar.
+4. Entra em **Definições do Sistema → Privacidade e Segurança**.
+5. Faz scrool até meio e diz ao sistema: **"Nexar HUB foi bloqueada mas confio! → Abrir Mesmo Assim"** 
 
-### Método 2 — Terminal (1 comando, mais rápido)
+### Método 2 — Desbloqueio via Terminal
 
-Depois de arrastar a app para `/Applications`, corre no Terminal:
-
-```bash
-xattr -rd com.apple.quarantine /Applications/nexar-app.app
-```
-
-Ou diretamente no DMG antes de instalar:
+Limpa a restrição diretamente no diretório das Aplicações:
 
 ```bash
-xattr -rd com.apple.quarantine ~/Downloads/nexar-app_*.dmg
+xattr -rd com.apple.quarantine "/Applications/Nexar HUB.app"
 ```
 
-> [!NOTE]
-> Este é o comportamento normal do macOS para apps distribuídas fora da App Store sem notarização Apple (€99/ano). Qualquer app industrial interna partilha esta limitação. O processo é feito **apenas uma vez por máquina**.
+## 🔒 Segurança de Rede
 
----
+> **NUNCA partilhe de que forma for as linhas de acesso que estão escondidas no vosso `.env`. O mural de segurança RLS defende-vos totalmente num browser standard, mas é possível extrair informações se a base de dados for encurralada remotamente**
 
-## 🔒 Segurança
+## 🌿 Flow de Versionamento
 
-> **IMPORTANTE:** O ficheiro `.env` contém as chaves da cloud e está incluído no `.gitignore`. **Nunca commitar este ficheiro.** As chaves permitem acesso à base de dados de produção.
-
-A segurança assenta em três camadas:
-1. **Autenticação** — Supabase Auth com tokens JWT
-2. **RLS** — Políticas ao nível da base de dados (não contornáveis pelo cliente)
-3. **Tauri CSP** — Restrições de Content Security Policy na janela nativa
-
----
-
-## 🌿 Branches
-
-| Branch | Propósito |
+| Branch | Propósito Global |
 |:---|:---|
-| `main` | Produção estável |
-| `feature/user-auth-and-data-isolation` | Branch de desenvolvimento atual |
+| `main` | Produção Core Estável (V2.1 - Master Version com Exportação e Sistema de Notas e Offline Ativo) |
