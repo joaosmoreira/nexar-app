@@ -5,6 +5,7 @@ import { Folder, FileCog, Layers, Plus, Archive, AlertTriangle, CheckCircle2, Se
 import { supabase } from '../supabaseClient';
 import { cn } from '../lib/utils';
 import { Modal } from './Modal';
+import { toast } from 'sonner';
 
 function ProjectItem({ projeto }: { projeto: Projeto }) {
   const { selectedProjectId, selectedOfId, setSelectedProject } = useAppStore();
@@ -120,24 +121,78 @@ function OfItem({ ofData }: { ofData: OrdemFabrico }) {
 }
 
 export function Sidebar() {
-  const { isArchiveMode, setArchiveMode, user, isOnline, isSyncing, lastSyncAt, hasPendingMutations } = useAppStore();
+  const { isArchiveMode, setArchiveMode, user, isOnline, isSyncing, lastSyncAt, hasPendingMutations, dataVersion } = useAppStore();
   const [projetos, setProjetos] = useState<Projeto[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const loadProjetos = async () => {
-    setLoading(true);
+  const loadProjetos = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const data = isArchiveMode ? await fetchProjetosArquivados() : await fetchProjetos();
       setProjetos(data);
+      // Atualizar a última data de sincronização visual
+      useAppStore.getState().setLastSyncAt(new Date().toISOString());
     } catch (error) {
       console.error("Erro ao carregar projetos:", error);
     }
-    setLoading(false);
+    if (!silent) setLoading(false);
   };
 
   useEffect(() => {
-    loadProjetos();
-  }, [isArchiveMode]); 
+    loadProjetos(false);
+
+    // Ciclo de sincronização automática de 60 em 60 segundos
+    const syncInterval = setInterval(() => {
+      const store = useAppStore.getState();
+      // Só faz auto-refresh se estivermos com internet e sem alterações pendentes prioritárias
+      if (store.isOnline && !store.hasPendingMutations) {
+        store.setSyncing(true);
+        loadProjetos(true).finally(() => {
+           store.setSyncing(false);
+        });
+      }
+    }, 60000);
+
+    return () => clearInterval(syncInterval);
+  }, [isArchiveMode, dataVersion]); 
+
+  const [width, setWidth] = useState(() => {
+    const saved = localStorage.getItem('nexar-sidebar-width');
+    return saved ? Math.max(288, parseInt(saved, 10)) : 288;
+  });
+  const [isResizing, setIsResizing] = useState(false);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing) return;
+      let newWidth = e.clientX;
+      if (newWidth < 288) newWidth = 288;
+      if (newWidth > 600) newWidth = 600;
+      setWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    } else {
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      localStorage.setItem('nexar-sidebar-width', width.toString());
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizing, width]);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [newProjRef, setNewProjRef] = useState("");
@@ -153,13 +208,26 @@ export function Sidebar() {
       setModalOpen(false);
       setNewProjRef("");
       setNewProjCli("");
+      useAppStore.getState().incrementDataVersion();
+      toast.success("Projeto criado com sucesso!");
     } catch (e: any) {
-      alert("Erro ao criar projeto: " + e.message);
+      toast.error("Erro ao criar projeto: " + e.message);
     }
   };
 
   return (
-    <aside className="w-72 bg-slate-900 border-r border-slate-800 flex flex-col h-full relative">
+    <aside 
+      style={{ width: `${width}px` }}
+      className="bg-slate-900 border-r border-slate-800 flex flex-col h-full relative shrink-0 transition-all duration-0"
+    >
+      <div 
+        onMouseDown={(e) => { e.preventDefault(); setIsResizing(true); }}
+        className={cn(
+          "absolute top-0 right-[-3px] w-1.5 h-full cursor-col-resize z-50 transition-colors",
+          isResizing ? "bg-sky-500" : "hover:bg-sky-500/50"
+        )}
+      />
+
       <Modal isOpen={modalOpen} title="Novo Projeto" onClose={() => setModalOpen(false)}>
         <form onSubmit={handleCreateProjeto} className="flex flex-col gap-4">
           <div>
@@ -189,7 +257,7 @@ export function Sidebar() {
               className="w-full bg-slate-950 border border-slate-800 text-slate-200 rounded-lg p-2.5 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none transition-all"
             />
           </div>
-          <button type="submit" className="mt-2 w-full bg-sky-500 hover:bg-sky-400 text-white font-medium rounded-lg p-3 transition-colors">
+          <button type="submit" className="mt-2 w-full bg-sky-500 hover:bg-sky-400 active:scale-95 text-white font-medium rounded-lg p-3 transition-all duration-150">
             Adicionar Projeto
           </button>
         </form>
@@ -198,7 +266,7 @@ export function Sidebar() {
       {/* HEADER da Sidebar - HUB */}
       <button 
         onClick={() => { setArchiveMode(false); useAppStore.getState().setSelectedProject(null); }}
-        className="p-4 border-b border-slate-800 flex items-center gap-3 w-full text-left hover:bg-slate-800/30 transition-colors group cursor-pointer shrink-0"
+        className="p-4 border-b border-slate-800 flex items-center gap-3 w-full text-left hover:bg-slate-800/30 active:scale-[0.98] transition-all duration-150 group cursor-pointer shrink-0"
         title="Voltar ao HUB Global"
       >
         <div className="w-8 h-8 rounded bg-sky-500/10 flex items-center justify-center border border-sky-500/20 group-hover:bg-sky-500/20 transition-colors">
@@ -214,10 +282,10 @@ export function Sidebar() {
       <div className="px-4 py-3 border-b border-slate-800 shrink-0">
         <button 
            onClick={() => useAppStore.getState().setSearchOpen(true)}
-           className="w-full flex items-center gap-2 bg-slate-950 border border-slate-800 hover:border-sky-500/50 transition-colors text-slate-400 hover:text-slate-200 rounded-lg p-2.5 text-sm outline-none group"
+           className="w-full flex items-center gap-2 bg-slate-950 border border-slate-800 hover:border-sky-500/50 active:scale-[0.98] transition-all text-slate-400 hover:text-slate-200 rounded-lg p-2.5 text-sm outline-none group"
         >
           <Search size={16} className="group-hover:text-sky-400 transition-colors shrink-0" />
-          <span className="flex-1 text-left text-[13px]">Pesquisa Suprema...</span>
+          <span className="flex-1 text-left text-[13px]">Pesquisa...</span>
           <span className="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded text-slate-500 font-medium tracking-widest shrink-0 hidden lg:block">CMD+K</span>
         </button>
       </div>
@@ -232,14 +300,14 @@ export function Sidebar() {
             <div className="flex gap-2">
               <button 
                 onClick={() => setModalOpen(true)}
-                className="text-sky-400 hover:text-sky-300 bg-sky-500/10 hover:bg-sky-500/20 p-1 rounded transition-colors" 
+                className="text-sky-400 hover:text-sky-300 bg-sky-500/10 hover:bg-sky-500/20 active:scale-90 p-1 rounded transition-all" 
                 title="Novo Projeto"
               >
                 <Plus size={14} />
               </button>
               <button 
-                onClick={loadProjetos}
-                className="text-slate-500 hover:text-slate-300 p-1" 
+                onClick={() => loadProjetos(false)}
+                className="text-slate-500 hover:text-slate-300 p-1 active:scale-90 transition-all" 
                 title="Atualizar"
               >
                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21v-5h5"/></svg>
@@ -295,7 +363,7 @@ export function Sidebar() {
         <button 
           onClick={() => setArchiveMode(!isArchiveMode)}
           className={cn(
-            "w-full flex items-center justify-center gap-2 p-3 rounded-lg transition-colors border text-sm font-medium",
+            "w-full flex items-center justify-center gap-2 p-3 rounded-lg active:scale-[0.98] transition-all duration-150 border text-sm font-medium",
             isArchiveMode 
               ? "bg-amber-500/20 text-amber-400 border-amber-500/30" 
               : "text-slate-400 border-slate-700 hover:bg-slate-800 hover:text-slate-200"
@@ -317,7 +385,7 @@ export function Sidebar() {
            </div>
            <button 
              onClick={() => supabase.auth.signOut()}
-             className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
+             className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 active:scale-90 rounded transition-all"
              title="Terminar Sessão"
            >
              <LogOut size={16} />

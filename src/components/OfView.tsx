@@ -11,6 +11,7 @@ import { FileDown, CheckCircle2, Circle, Settings2, Plus, Trash2, Pencil, GripVe
 import { useAppStore } from '../store/useAppStore';
 import { cn } from '../lib/utils';
 import { Modal } from './Modal';
+import { toast } from 'sonner';
 import {
   DndContext, closestCenter, PointerSensor, useSensor, useSensors,
   DragEndEvent, DragOverlay, DragStartEvent,
@@ -114,19 +115,19 @@ function SortableTask({ tarefa, onToggle, onDelete, onRenameSubmit }: SortableTa
       <div className={cn('flex items-center gap-1 flex-shrink-0 transition-opacity', editing ? 'opacity-100' : 'opacity-0 group-hover:opacity-100')}>
         {editing ? (
           <>
-            <button onClick={e => { e.stopPropagation(); submitEdit(); }} className="p-1.5 rounded-lg bg-sky-500/20 text-sky-400 hover:bg-sky-500/30 transition-colors" title="Guardar">
+            <button onClick={e => { e.stopPropagation(); submitEdit(); }} className="p-1.5 rounded-lg bg-sky-500/20 text-sky-400 hover:bg-sky-500/30 active:scale-90 transition-all" title="Guardar">
               <Check size={14} />
             </button>
-            <button onClick={e => { e.stopPropagation(); cancelEdit(); }} className="p-1.5 rounded-lg bg-slate-700/50 text-slate-400 hover:bg-slate-700 transition-colors" title="Cancelar">
+            <button onClick={e => { e.stopPropagation(); cancelEdit(); }} className="p-1.5 rounded-lg bg-slate-700/50 text-slate-400 hover:bg-slate-700 active:scale-90 transition-all" title="Cancelar">
               <X size={14} />
             </button>
           </>
         ) : (
           <>
-            <button onClick={startEdit} className="p-1.5 rounded-lg text-slate-500 hover:text-sky-400 hover:bg-sky-500/10 transition-colors" title="Editar nome">
+            <button onClick={startEdit} className="p-1.5 rounded-lg text-slate-500 hover:text-sky-400 hover:bg-sky-500/10 active:scale-90 transition-all" title="Editar nome">
               <Pencil size={14} />
             </button>
-            <button onClick={e => { e.stopPropagation(); onDelete(tarefa.id); }} className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors" title="Apagar tarefa">
+            <button onClick={e => { e.stopPropagation(); onDelete(tarefa.id); }} className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 active:scale-90 transition-all" title="Apagar tarefa">
               <Trash2 size={14} />
             </button>
           </>
@@ -139,6 +140,7 @@ function SortableTask({ tarefa, onToggle, onDelete, onRenameSubmit }: SortableTa
 // ─── Main Component ────────────────────────────────────────────────────────────
 
 export function OfView({ ofId }: { ofId: number }) {
+  const dataVersion = useAppStore(state => state.dataVersion);
   const [ofData, setOfData] = useState<OrdemFabrico | null>(null);
   const [tarefas, setTarefas] = useState<Tarefa[]>([]);
   const [loading, setLoading] = useState(true);
@@ -174,24 +176,25 @@ export function OfView({ ofId }: { ofId: number }) {
     setLoading(false);
   };
 
-  useEffect(() => { loadData(); }, [ofId]);
+  useEffect(() => { loadData(); }, [ofId, dataVersion]);
 
   const handleToggle = async (t: Tarefa) => {
     setTarefas(prev => prev.map(task => task.id === t.id ? { ...task, concluido: !t.concluido } : task));
     try {
       await toggleTarefaConcluida(t.id, !t.concluido);
       if (ofData?.projeto_id) updateProjectoUltimoMovimento(ofData.projeto_id).catch(() => null);
+      useAppStore.getState().incrementDataVersion();
     } catch { setTarefas(prev => prev.map(task => task.id === t.id ? { ...task, concluido: t.concluido } : task)); }
   };
 
   const handleDeleteTarefa = async (id: number) => {
     setTarefas(prev => prev.filter(t => t.id !== id));
-    try { await deleteTarefa(id); } catch (e: any) { alert('Erro ao apagar tarefa: ' + e.message); loadData(); }
+    try { await deleteTarefa(id); toast.success("Tarefa apagada."); } catch (e: any) { toast.error('Erro ao apagar tarefa: ' + e.message); loadData(); }
   };
 
   const handleRenameTask = async (id: number, nome: string) => {
     setTarefas(prev => prev.map(t => t.id === id ? { ...t, nome_tarefa: nome } : t));
-    try { await updateTarefa(id, nome); } catch (e: any) { alert('Erro ao renomear: ' + e.message); loadData(); }
+    try { await updateTarefa(id, nome); toast.success("Nome atualizado."); } catch (e: any) { toast.error('Erro ao renomear: ' + e.message); loadData(); }
   };
 
   const startEditOfName = () => {
@@ -204,7 +207,7 @@ export function OfView({ ofId }: { ofId: number }) {
     const trimmed = editOfValue.trim();
     if (trimmed && trimmed !== ofData?.nome_of && ofData) {
       setOfData(prev => prev ? { ...prev, nome_of: trimmed } : prev);
-      try { await updateOrdemFabrico(ofData.id, { nome_of: trimmed }); } catch (e: any) { alert('Erro: ' + e.message); loadData(); }
+      try { await updateOrdemFabrico(ofData.id, { nome_of: trimmed }); toast.success("OF renomeada."); } catch (e: any) { toast.error('Erro: ' + e.message); loadData(); }
     }
     setEditingOfName(false);
   };
@@ -215,7 +218,7 @@ export function OfView({ ofId }: { ofId: number }) {
         await updateOrdemFabrico(ofId, { notas });
         setInitialNotas(notas);
       } catch (e: any) {
-        alert("Erro ao guardar notas: " + e.message);
+        toast.error("Erro ao guardar notas: " + e.message);
       }
     }
   };
@@ -231,7 +234,7 @@ export function OfView({ ofId }: { ofId: number }) {
     const reordered = arrayMove(tarefas, oldIndex, newIndex).map((t, i) => ({ ...t, ordem_index: i }));
     setTarefas(reordered);
     try { await reorderTarefas(reordered.map(t => ({ id: t.id, ordem_index: t.ordem_index }))); }
-    catch (e: any) { alert('Erro ao reordenar: ' + e.message); loadData(); }
+    catch (e: any) { toast.error('Erro ao reordenar: ' + e.message); loadData(); }
   };
 
   const onExportJson = () => exportToJson(tarefas.map(t => ({ Tarefa: t.nome_tarefa, Status: t.concluido ? 'Concluída' : 'Pendente' })), `tarefas_${ofData?.numero_of}`);
@@ -245,16 +248,23 @@ export function OfView({ ofId }: { ofId: number }) {
       setTarefas([...tarefas, novaTarefa]);
       setModalOpen(false);
       setNewTaskName('');
-    } catch (e: any) { alert('Erro ao adicionar tarefa: ' + e.message); }
+      useAppStore.getState().incrementDataVersion();
+      toast.success("Tarefa adicionada!");
+    } catch (e: any) { toast.error('Erro ao adicionar tarefa: ' + e.message); }
   };
 
   const confirmApagar = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!ofData) return;
     if (deleteInputName === ofData.numero_of) {
-      try { await deleteOrdemFabrico(ofId); useAppStore.getState().setSelectedOf(null); }
-      catch (e: any) { alert(e.message); }
-    } else { alert('O número inserido não corresponde com o da OF atual.'); }
+      try { 
+         await deleteOrdemFabrico(ofId); 
+         useAppStore.getState().incrementDataVersion();
+         toast.success("OF apagada."); 
+         useAppStore.getState().setSelectedOf(null); 
+      }
+      catch (e: any) { toast.error(e.message); }
+    } else { toast.error('O número inserido não corresponde com o da OF atual.'); }
   };
 
   if (loading) return <div className="p-8 text-slate-400">A carregar detalhes da OF...</div>;
@@ -280,7 +290,7 @@ export function OfView({ ofId }: { ofId: number }) {
               placeholder="Escreva número..."
               className="w-full bg-slate-950 border border-red-900/50 text-slate-200 rounded-lg p-2.5 focus:border-red-500 focus:ring-1 focus:ring-red-500 outline-none transition-all" />
           </div>
-          <button type="submit" className="mt-2 w-full bg-red-600 hover:bg-red-500 text-white font-medium rounded-lg p-3 transition-colors">
+          <button type="submit" className="mt-2 w-full bg-red-600 hover:bg-red-500 active:scale-95 text-white font-medium rounded-lg p-3 transition-all">
             Confirmar Eliminação Desta OF
           </button>
         </form>
@@ -295,7 +305,7 @@ export function OfView({ ofId }: { ofId: number }) {
               placeholder="ex: Rever acabamentos"
               className="w-full bg-slate-950 border border-slate-800 text-slate-200 rounded-lg p-2.5 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none transition-all" />
           </div>
-          <button type="submit" className="mt-2 w-full bg-sky-500 hover:bg-sky-400 text-white font-medium rounded-lg p-3 transition-colors">
+          <button type="submit" className="mt-2 w-full bg-sky-500 hover:bg-sky-400 active:scale-95 text-white font-medium rounded-lg p-3 transition-all">
             Adicionar Passo
           </button>
         </form>
@@ -329,7 +339,7 @@ export function OfView({ ofId }: { ofId: number }) {
               <div className="flex items-center gap-2">
                 <h2 className="text-3xl font-bold text-slate-100">{ofData.nome_of}</h2>
                 <button onClick={startEditOfName}
-                  className="opacity-0 group-hover/title:opacity-100 p-1.5 rounded-lg text-slate-500 hover:text-sky-400 hover:bg-sky-500/10 transition-all"
+                  className="opacity-0 group-hover/title:opacity-100 p-1.5 rounded-lg text-slate-500 hover:text-sky-400 hover:bg-sky-500/10 active:scale-90 transition-all"
                   title="Editar nome da OF">
                   <Pencil size={16} />
                 </button>
@@ -339,12 +349,12 @@ export function OfView({ ofId }: { ofId: number }) {
 
           <div className="flex gap-2 shrink-0">
             <button onClick={() => { setDeleteModalOpen(true); setDeleteInputName(''); }}
-              className="flex items-center gap-2 px-3 py-2 bg-red-600/10 text-red-500 hover:bg-red-600/20 text-sm font-medium rounded-lg transition-colors border border-red-500/20">
+              className="flex items-center gap-2 px-3 py-2 bg-red-600/10 text-red-500 hover:bg-red-600/20 active:scale-95 text-sm font-medium rounded-lg transition-all border border-red-500/20">
               <Trash2 size={16} /> Apagar
             </button>
             <div className="w-px bg-slate-700/50 mx-2" />
             <div className="relative group">
-              <button className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium border border-slate-700 rounded-lg transition-colors">
+              <button className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 text-sm font-medium border border-slate-700 rounded-lg transition-all">
                 <FileDown size={16} /> Exportar
               </button>
               <div className="absolute right-0 top-full mt-2 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 overflow-hidden flex flex-col">
@@ -419,7 +429,7 @@ export function OfView({ ofId }: { ofId: number }) {
         )}
 
         <button onClick={() => setModalOpen(true)}
-          className="mt-4 w-full flex items-center justify-center gap-2 p-3 rounded-xl border border-dashed border-slate-700 text-slate-400 hover:text-sky-400 hover:border-sky-500/50 hover:bg-sky-500/5 transition-all">
+          className="mt-4 w-full flex items-center justify-center gap-2 p-3 rounded-xl border border-dashed border-slate-700 text-slate-400 hover:text-sky-400 hover:border-sky-500/50 hover:bg-sky-500/5 active:scale-[0.98] transition-all">
           <Plus size={18} />
           <span>Adicionar Tarefa Personalizada</span>
         </button>

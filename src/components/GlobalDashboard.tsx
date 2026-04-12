@@ -5,7 +5,7 @@ import { LayoutGrid, Layers, Archive, Factory } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 export function GlobalDashboard() {
-  const { isArchiveMode, setSelectedProject } = useAppStore();
+  const { isArchiveMode, setSelectedProject, dataVersion } = useAppStore();
   const [metrics, setMetrics] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -22,7 +22,7 @@ export function GlobalDashboard() {
 
   useEffect(() => {
     loadMetrics();
-  }, [isArchiveMode]);
+  }, [isArchiveMode, dataVersion]);
 
   if (loading) {
      return <div className="p-8 text-slate-400 font-medium animate-pulse">A carregar métricas globais...</div>;
@@ -50,7 +50,7 @@ export function GlobalDashboard() {
            <span className="text-lg font-medium">Nenhum projeto encontrado.</span>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid gap-6" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(max(280px, calc(33.333% - 16px)), 1fr))' }}>
           {metrics.map(projeto => {
              let abertas = 0;
              let concluido = 0;

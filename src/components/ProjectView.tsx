@@ -6,6 +6,7 @@ import { FileDown, PlusCircle, Archive, Trash2 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { cn } from '../lib/utils';
 import { Modal } from './Modal';
+import { toast } from 'sonner';
 
 interface OFWithProgress extends OrdemFabrico {
   tarefas: { concluido: boolean }[];
@@ -13,7 +14,7 @@ interface OFWithProgress extends OrdemFabrico {
 }
 
 export function ProjectView({ projetoId }: { projetoId: number }) {
-
+  const dataVersion = useAppStore(state => state.dataVersion);
   const [projeto, setProjeto] = useState<Projeto | null>(null);
   const [ofs, setOfs] = useState<OFWithProgress[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,7 +67,7 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
 
   useEffect(() => {
     loadData();
-  }, [projetoId]);
+  }, [projetoId, dataVersion]);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [newOfName, setNewOfName] = useState("");
@@ -105,8 +106,10 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
       setModalOpen(false);
       setNewOfName("");
       setNewOfNumber("");
+      useAppStore.getState().incrementDataVersion();
+      toast.success("Ordem de fabrico criada com sucesso!");
     } catch (e: any) {
-      alert("Erro ao criar: " + e.message);
+      toast.error("Erro ao criar: " + e.message);
     } finally {
       setCreating(false);
     }
@@ -131,8 +134,10 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
     if (archiveProgress < 100) return;
     try {
       await arquivarProjeto(projetoId);
+      useAppStore.getState().incrementDataVersion();
+      toast.success("Projeto arquivado na Cloud!");
       useAppStore.getState().setSelectedProject(null);
-    } catch(e: any) { alert(e.message) }
+    } catch(e: any) { toast.error(e.message) }
   }
 
   const handleApagar = () => {
@@ -146,10 +151,12 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
     if (deleteInputName === projeto.nome) {
        try {
          await deleteProjeto(projetoId);
+         useAppStore.getState().incrementDataVersion();
+         toast.success("Obra mestre apagada permanentemente.");
          useAppStore.getState().setSelectedProject(null);
-       } catch(e: any) { alert(e.message) }
+       } catch(e: any) { toast.error(e.message) }
     } else {
-       alert("O texto inserido não coincide com o nome da obra. Tente novamente.");
+       toast.error("O texto inserido não coincide com o nome da obra. Tente novamente.");
     }
   }
 
@@ -159,7 +166,7 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
         await updateProjetoNotas(projeto.id, notas);
         setInitialNotas(notas);
       } catch (e: any) {
-        alert("Erro ao guardar notas: " + e.message);
+        toast.error("Erro ao guardar notas: " + e.message);
       }
     }
   };
@@ -193,7 +200,7 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
             <button 
               type="submit" 
               disabled={archiveProgress < 100}
-              className="flex-1 text-sm bg-amber-600 hover:bg-amber-500 text-white font-medium rounded-lg p-3 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 text-sm bg-amber-600 hover:bg-amber-500 active:scale-95 text-white font-medium rounded-lg p-3 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
                {archiveProgress < 100 ? `A preparar selagem... ${archiveProgress}%` : "Confirmar Arquivo"}
             </button>
@@ -218,7 +225,7 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
               className="w-full bg-slate-950 border border-red-900/50 text-slate-200 rounded-lg p-2.5 focus:border-red-500 focus:ring-1 focus:ring-red-500 outline-none transition-all"
             />
           </div>
-          <button type="submit" className="mt-2 w-full bg-red-600 hover:bg-red-500 text-white font-medium rounded-lg p-3 transition-colors">
+          <button type="submit" className="mt-2 w-full bg-red-600 hover:bg-red-500 active:scale-95 text-white font-medium rounded-lg p-3 transition-all">
              Confirmar Eliminação Global
           </button>
         </form>
@@ -249,7 +256,7 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
               className="w-full bg-slate-950 border border-slate-800 text-slate-200 rounded-lg p-2.5 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none transition-all"
             />
           </div>
-          <button disabled={creating} type="submit" className="mt-2 w-full bg-sky-500 hover:bg-sky-400 text-white font-medium rounded-lg p-3 transition-colors disabled:opacity-50">
+          <button disabled={creating} type="submit" className="mt-2 w-full bg-sky-500 hover:bg-sky-400 active:scale-95 text-white font-medium rounded-lg p-3 transition-all disabled:opacity-50">
             {creating ? "A Criar..." : "Salvar Ordem"}
           </button>
         </form>
@@ -268,16 +275,16 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
         </div>
         <div className="flex gap-2">
           {!projeto.arquivado && (
-            <button onClick={handleArquivar} className="flex items-center gap-2 px-3 py-2 bg-amber-600/10 text-amber-500 hover:bg-amber-600/20 text-sm font-medium rounded-lg transition-colors border border-amber-500/20">
+            <button onClick={handleArquivar} className="flex items-center gap-2 px-3 py-2 bg-amber-600/10 text-amber-500 hover:bg-amber-600/20 active:scale-95 text-sm font-medium rounded-lg transition-all border border-amber-500/20">
               <Archive size={16} /> Arquivar
             </button>
           )}
-          <button onClick={handleApagar} className="flex items-center gap-2 px-3 py-2 bg-red-600/10 text-red-500 hover:bg-red-600/20 text-sm font-medium rounded-lg transition-colors border border-red-500/20">
+          <button onClick={handleApagar} className="flex items-center gap-2 px-3 py-2 bg-red-600/10 text-red-500 hover:bg-red-600/20 active:scale-95 text-sm font-medium rounded-lg transition-all border border-red-500/20">
             <Trash2 size={16} /> Apagar
           </button>
           <div className="w-px bg-slate-700/50 mx-2" />
           <div className="relative group">
-            <button className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium border border-slate-700 rounded-lg transition-colors">
+            <button className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 text-sm font-medium border border-slate-700 rounded-lg transition-all">
               <FileDown size={16} /> Exportar
             </button>
             <div className="absolute right-0 top-full mt-2 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 overflow-hidden flex flex-col">
@@ -293,7 +300,7 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
       </div>
 
       {/* DASHBOARD CARDS */}
-      <div className="grid grid-cols-3 gap-6 mb-8">
+      <div className="grid gap-6 mb-8" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(max(250px, calc(33.333% - 16px)), 1fr))' }}>
         <div className="bg-slate-800/50 border border-slate-700 p-5 rounded-2xl">
           <div className="text-sm text-slate-400 mb-1">Total de OFs</div>
           <div className="text-3xl font-light text-slate-100">{ofs.length}</div>
@@ -346,7 +353,7 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
             <button 
               onClick={() => setModalOpen(true)}
               disabled={creating}
-              className="flex items-center gap-2 px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 bg-sky-600 hover:bg-sky-500 active:scale-95 text-white text-sm font-medium rounded-lg transition-all disabled:opacity-50"
             >
               <PlusCircle size={16} />
               Nova OF

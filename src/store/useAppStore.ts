@@ -15,6 +15,9 @@ interface AppState {
   lastSyncAt: string | null;
   hasPendingMutations: boolean;
 
+  // Global Refresh Bus
+  dataVersion: number;
+
   setUser: (user: User | null, session: Session | null) => void;
   setSelectedProject: (id: number | null) => void;
   setSelectedOf: (id: number | null) => void;
@@ -25,6 +28,8 @@ interface AppState {
   setSyncing: (syncing: boolean) => void;
   setLastSyncAt: (ts: string) => void;
   setPendingMutations: (has: boolean) => void;
+  
+  incrementDataVersion: () => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -39,6 +44,7 @@ export const useAppStore = create<AppState>((set) => ({
   isSyncing: false,
   lastSyncAt: null,
   hasPendingMutations: false,
+  dataVersion: 0,
 
   setUser: (user, session) => set({ user, session }),
   setSelectedProject: (id) => set({ selectedProjectId: id, selectedOfId: null, isArchiveMode: false }),
@@ -50,4 +56,5 @@ export const useAppStore = create<AppState>((set) => ({
   setSyncing: (syncing) => set({ isSyncing: syncing }),
   setLastSyncAt: (ts) => set({ lastSyncAt: ts }),
   setPendingMutations: (has) => set({ hasPendingMutations: has }),
+  incrementDataVersion: () => set((state) => ({ dataVersion: state.dataVersion + 1 })),
 }));
