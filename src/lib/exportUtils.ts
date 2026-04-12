@@ -45,7 +45,7 @@ export const exportProjectExcelWithTasks = async (projetoNome: string, cliente: 
           const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
           await writeFile(filePath, new Uint8Array(excelBuffer));
        }
-     } catch (e: any) { alert("Erro ao guardar documento: " + e.message); }
+     } catch (e: any) { alert("Erro ao guardar documento: " + (e?.message || String(e))); }
   } else {
      // Fallback para quando o João testa no Google Chrome / Safari normal ("npm run dev" fora da App)
      XLSX.writeFile(workbook, `${filename}.xlsx`);
@@ -67,7 +67,7 @@ export const exportToExcel = async (data: any[], filename: string) => {
           const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
           await writeFile(filePath, new Uint8Array(excelBuffer));
        }
-     } catch (e: any) { alert("Erro ao guardar excell: " + e.message); }
+     } catch (e: any) { alert("Erro ao guardar excell: " + (e?.message || String(e))); }
   } else {
      XLSX.writeFile(workbook, `${filename}.xlsx`);
   }
@@ -83,7 +83,7 @@ export const exportToJson = async (data: any[], filename: string) => {
        if (filePath) {
           await writeTextFile(filePath, JSON.stringify(data, null, 2));
        }
-     } catch (e: any) { alert("Erro ao guardar json: " + e.message); }
+     } catch (e: any) { alert("Erro ao guardar json: " + (e?.message || String(e))); }
   } else {
      // Browser nativo
      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data, null, 2));
