@@ -16,7 +16,7 @@ export interface CacheData {
 
 export type MutationAction =
   | { action: 'createProjeto';   tempId: number; nome: string; cliente: string }
-  | { action: 'createOF';        tempId: number; projetoId: number; nomeOf: string; numeroOf: string }
+  | { action: 'createOF';        tempId: number; projetoId: number; nomeOf: string; numeroOf: string; prazoLimite?: string | null }
   | { action: 'toggleTarefa';    tarefaId: number; concluido: boolean }
   | { action: 'arquivarProjeto'; projetoId: number }
   | { action: 'deleteProjeto';   projetoId: number }
@@ -123,7 +123,7 @@ export function nextTempId(): number {
 
 export interface RemoteApi {
   createProjetoRemote: (nome: string, cliente: string) => Promise<any>;
-  createOFRemote: (projetoId: number, nomeOf: string, numeroOf: string) => Promise<any>;
+  createOFRemote: (projetoId: number, nomeOf: string, numeroOf: string, prazoLimite?: string | null) => Promise<any>;
   toggleTarefaConcluidaRemote: (tarefaId: number, concluido: boolean) => Promise<void>;
   arquivarProjetoRemote: (id: number) => Promise<void>;
   deleteProjetoRemote: (id: number) => Promise<void>;
@@ -167,7 +167,7 @@ export async function flushPendingMutations(api: RemoteApi): Promise<{ flushed: 
 
         case 'createOF': {
           const realProjetoId = resolveId(mut.projetoId);
-          const of = await api.createOFRemote(realProjetoId, mut.nomeOf, mut.numeroOf);
+          const of = await api.createOFRemote(realProjetoId, mut.nomeOf, mut.numeroOf, mut.prazoLimite);
           idMap[mut.tempId] = of.id;
           flushed++;
           break;

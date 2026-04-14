@@ -7,7 +7,7 @@ import {
   OrdemFabrico, Tarefa,
 } from '../services/api';
 import { exportToExcel, exportToJson } from '../lib/exportUtils';
-import { FileDown, CheckCircle2, Circle, Settings2, Plus, Trash2, Pencil, GripVertical, Check, X } from 'lucide-react';
+import { FileDown, CheckCircle2, Circle, Settings2, Plus, Trash2, Pencil, GripVertical, Check, X, CalendarClock, AlertTriangle } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { cn } from '../lib/utils';
 import { Modal } from './Modal';
@@ -154,6 +154,9 @@ export function OfView({ ofId }: { ofId: number }) {
   const [activeId, setActiveId] = useState<number | null>(null);
   const [notas, setNotas] = useState('');
   const [initialNotas, setInitialNotas] = useState('');
+  const [prazoLimite, setPrazoLimite] = useState<string | null>(null);
+  const [editingPrazo, setEditingPrazo] = useState(false);
+  const [prazoEditValue, setPrazoEditValue] = useState('');
   const ofNameInputRef = useRef<HTMLInputElement>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
@@ -170,6 +173,7 @@ export function OfView({ ofId }: { ofId: number }) {
       setProjectName((oData as any).projectos?.nome || ''); 
       setNotas((oData as any).notas || '');
       setInitialNotas((oData as any).notas || '');
+      setPrazoLimite((oData as any).prazo_limite || null);
     }
     const tData = await fetchTarefasByOf(ofId);
     setTarefas(tData);
@@ -222,6 +226,29 @@ export function OfView({ ofId }: { ofId: number }) {
       }
     }
   };
+
+  const handleSavePrazo = async () => {
+    const newPrazo = prazoEditValue ? new Date(prazoEditValue).toISOString() : null;
+    try {
+      await updateOrdemFabrico(ofId, { prazo_limite: newPrazo });
+      setPrazoLimite(newPrazo);
+      setEditingPrazo(false);
+      toast.success(newPrazo ? 'Prazo definido.' : 'Prazo removido.');
+    } catch (e: any) {
+      toast.error('Erro ao guardar prazo: ' + e.message);
+    }
+  };
+
+  const prazoInfo = (() => {
+    if (!prazoLimite) return null;
+    const d = new Date(prazoLimite);
+    const diffMs = d.getTime() - Date.now();
+    const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+    const label = d.toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' });
+    if (diffDays < 0) return { label, color: 'text-red-400', border: 'border-red-500/30', bg: 'bg-red-500/10', badge: 'Expirado', icon: 'red' };
+    if (diffDays <= 7) return { label, color: 'text-amber-400', border: 'border-amber-500/30', bg: 'bg-amber-500/10', badge: `${diffDays} dia${diffDays !== 1 ? 's' : ''}`, icon: 'amber' };
+    return { label, color: 'text-sky-400', border: 'border-sky-500/20', bg: 'bg-sky-500/5', badge: `${diffDays} dias`, icon: 'sky' };
+  })();
 
   const handleDragStart = (event: DragStartEvent) => setActiveId(event.active.id as number);
 
@@ -379,6 +406,66 @@ export function OfView({ ofId }: { ofId: number }) {
         <div className="w-full bg-slate-900 rounded-full h-3 border border-slate-700 flex items-center overflow-hidden">
           <div className="h-full bg-gradient-to-r from-sky-500 to-sky-400 transition-all duration-1000 ease-out" style={{ width: `${progresso}%` }} />
         </div>
+      </div>
+
+      {/* PRAZO LIMITE */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-2">
+          <label className="text-sm font-medium text-slate-400">Prazo Limite</label>
+          {!editingPrazo && (
+            <button
+              onClick={() => { setPrazoEditValue(prazoLimite ? prazoLimite.split('T')[0] : ''); setEditingPrazo(true); }}
+              className="text-xs text-slate-500 hover:text-sky-400 transition-colors flex items-center gap-1"
+            >
+              <Pencil size={11} /> {prazoLimite ? 'Alterar' : 'Definir prazo'}
+            </button>
+          )}
+        </div>
+
+        {editingPrazo ? (
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <CalendarClock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+              <input
+                autoFocus
+                type="date"
+                value={prazoEditValue}
+                onChange={e => setPrazoEditValue(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded-lg pl-9 pr-3 py-2.5 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none transition-all"
+              />
+            </div>
+            <button onClick={handleSavePrazo} className="p-2.5 rounded-lg bg-sky-500/20 text-sky-400 hover:bg-sky-500/30 active:scale-90 transition-all" title="Guardar">
+              <Check size={16} />
+            </button>
+            {prazoLimite && (
+              <button onClick={() => { setPrazoEditValue(''); handleSavePrazo(); }} className="p-2.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 active:scale-90 transition-all" title="Remover prazo">
+                <Trash2 size={16} />
+              </button>
+            )}
+            <button onClick={() => setEditingPrazo(false)} className="p-2.5 rounded-lg bg-slate-700/50 text-slate-400 hover:bg-slate-700 active:scale-90 transition-all" title="Cancelar">
+              <X size={16} />
+            </button>
+          </div>
+        ) : prazoInfo ? (
+          <div className={cn('flex items-center gap-3 p-3 rounded-xl border', prazoInfo.bg, prazoInfo.border)}>
+            {prazoInfo.icon === 'red' || prazoInfo.icon === 'amber'
+              ? <AlertTriangle size={16} className={prazoInfo.color} />
+              : <CalendarClock size={16} className={prazoInfo.color} />
+            }
+            <div className="flex-1">
+              <div className={cn('text-sm font-medium', prazoInfo.color)}>{prazoInfo.label}</div>
+              <div className="text-[10px] text-slate-500 uppercase tracking-wider mt-0.5">Prazo de entrega</div>
+            </div>
+            <span className={cn(
+              'text-xs font-bold px-2 py-1 rounded-lg',
+              prazoInfo.icon === 'red' ? 'bg-red-500/20 text-red-400' :
+              prazoInfo.icon === 'amber' ? 'bg-amber-500/20 text-amber-400' :
+              'bg-sky-500/20 text-sky-400'
+            )}>{prazoInfo.badge}</span>
+          </div>
+        ) : (
+          <div className="text-sm text-slate-600 italic">Sem prazo definido</div>
+        )}
       </div>
 
       {/* NOTAS DA OF */}

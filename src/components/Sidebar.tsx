@@ -1,13 +1,51 @@
 import { useEffect, useState } from 'react';
 import { useAppStore } from '../store/useAppStore';
-import { fetchProjetos, fetchOfsByProjeto, createProjeto, fetchProjetosArquivados, Projeto, OrdemFabrico } from '../services/api';
+import { fetchProjetos, fetchOfsByProjeto, createProjeto, fetchProjetosArquivados, fetchOfsWithDeadlineSoon, Projeto, OrdemFabrico } from '../services/api';
 import { Folder, FileCog, Layers, Plus, Archive, AlertTriangle, CheckCircle2, Search, LogOut, User, Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { cn } from '../lib/utils';
 import { Modal } from './Modal';
 import { toast } from 'sonner';
 
-function ProjectItem({ projeto }: { projeto: Projeto }) {
+// ─── Cache de prazos próximos (atualizado 1x/dia ou no arranque) ────────────
+const DEADLINE_CACHE_KEY = 'nexar-deadline-cache';
+const DEADLINE_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 horas
+
+interface DeadlineCache {
+  fetchedAt: number;
+  projectIds: number[]; // IDs dos projetos com pelo menos 1 OF c/ prazo < 7 dias
+}
+
+function readDeadlineCache(): DeadlineCache | null {
+  try {
+    const raw = localStorage.getItem(DEADLINE_CACHE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as DeadlineCache;
+  } catch {
+    return null;
+  }
+}
+
+function writeDeadlineCache(projectIds: number[]) {
+  const entry: DeadlineCache = { fetchedAt: Date.now(), projectIds };
+  localStorage.setItem(DEADLINE_CACHE_KEY, JSON.stringify(entry));
+}
+
+async function getDeadlineProjectIds(): Promise<number[]> {
+  const cached = readDeadlineCache();
+  if (cached && Date.now() - cached.fetchedAt < DEADLINE_CACHE_TTL_MS) {
+    return cached.projectIds;
+  }
+  // Cache expirada ou inexistente — vai buscar
+  const ofs = await fetchOfsWithDeadlineSoon();
+  const ids = [...new Set(ofs.map(o => o.projeto_id))];
+  writeDeadlineCache(ids);
+  return ids;
+}
+
+// ─── ProjectItem ──────────────────────────────────────────────────────────────
+
+function ProjectItem({ projeto, deadlineProjectIds }: { projeto: Projeto; deadlineProjectIds: number[] }) {
   const { selectedProjectId, selectedOfId, setSelectedProject } = useAppStore();
   const [ofs, setOfs] = useState<OrdemFabrico[]>([]);
   const [loading, setLoading] = useState(false);
@@ -43,6 +81,19 @@ function ProjectItem({ projeto }: { projeto: Projeto }) {
   const [ref, ...rest] = projeto.nome.split(" - ");
   const projNameOnly = rest.length > 0 ? rest.join(" - ") : (projeto.cliente || projeto.nome);
 
+  // Determinar ícone da pasta
+  const allDone = ofs.length > 0 && ofs.every((o: any) => o.progress === 100);
+  const hasDeadlineSoon = deadlineProjectIds.includes(projeto.id);
+
+  let folderIcon;
+  if (isExpanded && allDone) {
+    folderIcon = <CheckCircle2 size={18} className="shrink-0 text-emerald-500" />;
+  } else if (hasDeadlineSoon) {
+    folderIcon = <AlertTriangle size={18} className={cn("shrink-0 transition-colors", isSelected ? "text-amber-400" : "text-amber-500")} />;
+  } else {
+    folderIcon = <Folder size={18} className={cn("shrink-0 transition-colors", isSelected ? "text-sky-400" : "text-sky-500/50")} />;
+  }
+
   return (
     <div className="mb-2">
       <button
@@ -52,7 +103,7 @@ function ProjectItem({ projeto }: { projeto: Projeto }) {
           isSelected ? "bg-slate-800 text-slate-100" : "hover:bg-slate-800/50 text-slate-400"
         )}
       >
-        <Folder size={18} className={cn("shrink-0 transition-colors", isSelected ? "text-sky-400" : "text-sky-500/50")} />
+        {folderIcon}
         <div className="flex-1 text-left truncate">
            <div className="text-[10px] font-bold tracking-widest uppercase text-sky-500/70 mb-0.5">{ref}</div>
            <div className="text-[13px] font-medium leading-tight truncate text-slate-300 group-hover:text-slate-100 transition-colors">{projNameOnly}</div>
@@ -87,9 +138,20 @@ function OfItem({ ofData }: { ofData: OrdemFabrico }) {
   const ageMs = Date.now() - new Date(ofData.criado_em).getTime();
   const ageDays = ageMs / (1000 * 60 * 60 * 24);
 
+  // Verificar prazo limite
+  const now = Date.now();
+  const prazoMs = ofData.prazo_limite ? new Date(ofData.prazo_limite).getTime() - now : null;
+  const prazoEmDias = prazoMs !== null ? prazoMs / (1000 * 60 * 60 * 24) : null;
+  const prazoUrgente = prazoEmDias !== null && prazoEmDias <= 7 && prazoEmDias >= 0 && progresso < 100;
+  const prazoExpirado = prazoEmDias !== null && prazoEmDias < 0 && progresso < 100;
+
   let iconToRender;
   if (progresso >= 100) {
      iconToRender = <CheckCircle2 size={16} className="text-emerald-500" />;
+  } else if (prazoExpirado) {
+     iconToRender = <AlertTriangle size={16} className="text-red-500" />;
+  } else if (prazoUrgente) {
+     iconToRender = <AlertTriangle size={16} className="text-amber-400" />;
   } else if (ageDays > 21) {
      iconToRender = <AlertTriangle size={16} className="text-red-500" />;
   } else if (ageDays > 14) {
@@ -124,6 +186,7 @@ export function Sidebar() {
   const { isArchiveMode, setArchiveMode, user, isOnline, isSyncing, lastSyncAt, hasPendingMutations, dataVersion } = useAppStore();
   const [projetos, setProjetos] = useState<Projeto[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deadlineProjectIds, setDeadlineProjectIds] = useState<number[]>([]);
 
   const loadProjetos = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -137,6 +200,13 @@ export function Sidebar() {
     }
     if (!silent) setLoading(false);
   };
+
+  // Carregar cache de prazos — apenas no arranque e depois 1x/dia
+  useEffect(() => {
+    getDeadlineProjectIds()
+      .then(ids => setDeadlineProjectIds(ids))
+      .catch(() => {}); // silencioso — não é crítico
+  }, []);
 
   useEffect(() => {
     loadProjetos(false);
@@ -214,6 +284,10 @@ export function Sidebar() {
       toast.error("Erro ao criar projeto: " + e.message);
     }
   };
+
+  // Separar GS0000 dos restantes projetos
+  const gs0000 = projetos.find(p => p.nome.startsWith('GS0000'));
+  const outrosProjetos = projetos.filter(p => !p.nome.startsWith('GS0000'));
 
   return (
     <aside 
@@ -326,7 +400,22 @@ export function Sidebar() {
             Nenhum projeto encontrado.
           </div>
         ) : (
-          projetos.map(p => <ProjectItem key={p.id} projeto={p} />)
+          <>
+            {/* GS0000 — sempre fixo no topo */}
+            {gs0000 && (
+              <div className="mb-1">
+                <div className="px-3 py-1 mb-1">
+                  <span className="text-[9px] font-bold tracking-widest uppercase text-slate-600">Trabalhos Gerais</span>
+                </div>
+                <ProjectItem key={gs0000.id} projeto={gs0000} deadlineProjectIds={deadlineProjectIds} />
+                {outrosProjetos.length > 0 && <div className="my-2 border-t border-slate-800/60" />}
+              </div>
+            )}
+            {/* Restantes projetos */}
+            {outrosProjetos.map(p => (
+              <ProjectItem key={p.id} projeto={p} deadlineProjectIds={deadlineProjectIds} />
+            ))}
+          </>
         )}
       </div>
 

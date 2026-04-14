@@ -34,6 +34,9 @@ CREATE TABLE IF NOT EXISTS public.ordens_fabrico (
 -- Assegura que a coluna "notas" existe sempre na tabela de O.F.s
 ALTER TABLE public.ordens_fabrico ADD COLUMN IF NOT EXISTS notas text;
 
+-- Assegura que a coluna "prazo_limite" existe sempre na tabela de O.F.s
+ALTER TABLE public.ordens_fabrico ADD COLUMN IF NOT EXISTS prazo_limite timestamp with time zone;
+
 CREATE TABLE IF NOT EXISTS public.tarefas (
   id          bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   user_id     uuid REFERENCES auth.users(id) DEFAULT auth.uid() NOT NULL,

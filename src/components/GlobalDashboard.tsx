@@ -1,19 +1,37 @@
 import { useEffect, useState } from 'react';
-import { fetchDashboardMetrics } from '../services/api';
+import { fetchDashboardMetrics, fetchOldestOpenOFs } from '../services/api';
 import { useAppStore } from '../store/useAppStore';
-import { LayoutGrid, Layers, Archive, Factory } from 'lucide-react';
+import { LayoutGrid, Layers, Archive, Factory, AlertTriangle, Clock, CalendarClock } from 'lucide-react';
 import { cn } from '../lib/utils';
+
+// Helper para navegar directamente para uma OF (define projecto + OF)
+function navigateToOf(projetoId: number, ofId: number) {
+  useAppStore.setState({ selectedProjectId: projetoId, selectedOfId: ofId, isArchiveMode: false });
+}
+
+function AgeDot({ days }: { days: number }) {
+  if (days > 21) return <span className="inline-block w-2 h-2 rounded-full bg-red-500 shrink-0" />;
+  if (days > 14) return <span className="inline-block w-2 h-2 rounded-full bg-amber-500 shrink-0" />;
+  if (days > 7)  return <span className="inline-block w-2 h-2 rounded-full bg-yellow-400 shrink-0" />;
+  return <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 shrink-0" />;
+}
 
 export function GlobalDashboard() {
   const { isArchiveMode, setSelectedProject, dataVersion } = useAppStore();
   const [metrics, setMetrics] = useState<any[]>([]);
+  const [oldestOfs, setOldestOfs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
 
   const loadMetrics = async () => {
     setLoading(true);
     try {
-      const data = await fetchDashboardMetrics(isArchiveMode);
+      const [data, oldest] = await Promise.all([
+        fetchDashboardMetrics(isArchiveMode),
+        isArchiveMode ? Promise.resolve([]) : fetchOldestOpenOFs(5),
+      ]);
       setMetrics(data);
+      setOldestOfs(oldest);
     } catch (e: any) {
       console.error(e);
     }
@@ -44,6 +62,70 @@ export function GlobalDashboard() {
         </div>
       </div>
 
+      {/* ── ALERTAS: OFs abertas há mais tempo ─────────────────────── */}
+      {!isArchiveMode && oldestOfs.length > 0 && (
+        <div className="mb-8">
+          <div className="flex items-center gap-2 mb-3">
+            <AlertTriangle size={16} className="text-amber-400" />
+            <h2 className="text-sm font-semibold text-amber-400 uppercase tracking-wider">
+              Ordens em Aberto — Aguardam Despacho
+            </h2>
+          </div>
+          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+            {oldestOfs.map((of: any) => {
+              const ageDays = Math.floor((Date.now() - new Date(of.criado_em).getTime()) / (1000 * 60 * 60 * 24));
+              const projNome = of.projectos?.nome || '';
+              const [projRef] = projNome.split(' - ');
+
+              // prazo_limite badge
+              const prazoMs = of.prazo_limite ? new Date(of.prazo_limite).getTime() - Date.now() : null;
+              const prazoDias = prazoMs !== null ? Math.ceil(prazoMs / (1000 * 60 * 60 * 24)) : null;
+              const prazoExp = prazoDias !== null && prazoDias < 0;
+              const prazoUrg = prazoDias !== null && prazoDias >= 0 && prazoDias <= 7;
+
+              return (
+                <button
+                  key={of.id}
+                  onClick={() => navigateToOf(of.projeto_id, of.id)}
+                  className="text-left bg-slate-800/50 border border-amber-500/20 hover:border-amber-400/40 hover:bg-slate-800 rounded-xl p-4 transition-all group active:scale-95"
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <AgeDot days={ageDays} />
+                    <span className="text-[10px] font-bold tracking-widest uppercase text-slate-500">{projRef}</span>
+                  </div>
+                  <div className="font-mono text-sm font-bold text-sky-400 group-hover:text-sky-300 transition-colors mb-1 truncate">
+                    {of.numero_of}
+                  </div>
+                  <div className="text-xs text-slate-400 truncate mb-3">{of.nome_of}</div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1 text-[10px] text-slate-500">
+                      <Clock size={10} />
+                      <span className={cn(
+                        ageDays > 21 ? 'text-red-400 font-bold' :
+                        ageDays > 14 ? 'text-amber-400 font-semibold' :
+                        'text-slate-400'
+                      )}>
+                        {ageDays}d em aberto
+                      </span>
+                    </div>
+                    {(prazoExp || prazoUrg) && (
+                      <div className={cn(
+                        "flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded",
+                        prazoExp ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'
+                      )}>
+                        <CalendarClock size={9} />
+                        {prazoExp ? 'Expirado' : `${prazoDias}d`}
+                      </div>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── CARDS DE PROJETOS ──────────────────────────────────────── */}
       {metrics.length === 0 ? (
         <div className="flex flex-col items-center justify-center p-16 text-slate-500 border border-slate-800 rounded-2xl bg-slate-800/20 border-dashed">
            <Factory size={48} className="mb-4 opacity-50" />
