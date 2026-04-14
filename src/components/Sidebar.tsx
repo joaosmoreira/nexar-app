@@ -253,17 +253,6 @@ export function Sidebar() {
       let newWidth = e.clientX;
       if (newWidth < 288) newWidth = 288;
       if (newWidth > 450) newWidth = 450;
-
-      // Bloqueia expansão quando o conteúdo já está todo visível (sem overflow)
-      const nav = navRef.current;
-      if (nav && newWidth > width) {
-        // scrollWidth > offsetWidth → ainda há texto truncado → permite expandir
-        // scrollWidth <= offsetWidth → tudo cabe → bloqueia
-        if (nav.scrollWidth <= nav.offsetWidth) {
-          return; // não actualiza — conteúdo já cabe
-        }
-      }
-
       setWidth(newWidth);
     };
 
