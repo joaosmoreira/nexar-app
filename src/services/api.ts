@@ -153,25 +153,42 @@ export async function fetchDashboardMetrics(isArchiveMode: boolean) {
  * Devolve as OFs abertas há mais tempo (progress < 100), ordenadas por criado_em ASC.
  * Usado no GlobalDashboard para a secção de alertas.
  */
-export async function fetchOldestOpenOFs(limit = 5): Promise<any[]> {
+export async function fetchAlertOFs(limit = 6): Promise<any[]> {
+  const isOpenOf = (of: any) => {
+    const total = of.tarefas?.length || 0;
+    if (total === 0) return true;
+    return of.tarefas.filter((t: any) => t.concluido).length < total;
+  };
+
   if (isOnline()) {
     const { data, error } = await supabase
       .from('ordens_fabrico')
       .select('id, numero_of, nome_of, criado_em, prazo_limite, projeto_id, tarefas(concluido), projectos(nome)')
       .order('criado_em', { ascending: true })
-      .limit(limit * 4); // Busca extra para filtrar concluídas depois
+      .limit(60); // pool alargado para garantir 6 candidatos após filtragem
 
     if (error) throw error;
 
-    // Filtra as que não estão 100% concluídas
-    const open = (data || []).filter((of: any) => {
-      const total = of.tarefas?.length || 0;
-      if (total === 0) return true;
-      const done = of.tarefas.filter((t: any) => t.concluido).length;
-      return done < total;
-    });
+    const open: any[] = (data || []).filter(isOpenOf);
 
-    return open.slice(0, limit);
+    const now = Date.now();
+    const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+
+    // Urgentes: têm prazo definido e faltam ≤ 7 dias (e ainda não expirou)
+    const urgent = open.filter((of: any) => {
+      if (!of.prazo_limite) return false;
+      const diff = new Date(of.prazo_limite).getTime() - now;
+      return diff >= 0 && diff <= sevenDaysMs;
+    }).sort((a: any, b: any) =>
+      new Date(a.prazo_limite).getTime() - new Date(b.prazo_limite).getTime()
+    );
+
+    const urgentIds = new Set(urgent.map((of: any) => of.id));
+
+    // Restantes: abertas há mais tempo (já ordenadas por criado_em ASC)
+    const oldest = open.filter((of: any) => !urgentIds.has(of.id));
+
+    return [...urgent, ...oldest].slice(0, limit);
   } else {
     // Offline: usa o cache
     const cache = await readCache();
@@ -179,24 +196,36 @@ export async function fetchOldestOpenOFs(limit = 5): Promise<any[]> {
     const projetos: Projeto[] = [...(cache.projetos || []), ...(cache.projetoArquivados || [])];
     const projetoMap = new Map(projetos.map((p) => [p.id, p.nome]));
 
-    const allOfs: any[] = Object.values(ofsByProjeto).flat();
-    const open = allOfs
+    const now = Date.now();
+    const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+
+    const allOfs: any[] = (Object.values(ofsByProjeto) as any[][])
+      .flat()
       .filter((of: any) => {
         const total = of.tarefas?.length || 0;
         if (total === 0) return true;
-        const done = of.tarefas.filter((t: any) => t.concluido).length;
-        return done < total;
+        return of.tarefas.filter((t: any) => t.concluido).length < total;
       })
-      .sort((a: any, b: any) => new Date(a.criado_em).getTime() - new Date(b.criado_em).getTime())
-      .slice(0, limit)
-      .map((of: any) => ({
-        ...of,
-        projectos: { nome: projetoMap.get(of.projeto_id) || '' },
-      }));
+      .map((of: any) => ({ ...of, projectos: { nome: projetoMap.get(of.projeto_id) || '' } }));
 
-    return open;
+    const urgent = allOfs
+      .filter((of: any) => {
+        if (!of.prazo_limite) return false;
+        const diff = new Date(of.prazo_limite).getTime() - now;
+        return diff >= 0 && diff <= sevenDaysMs;
+      })
+      .sort((a: any, b: any) => new Date(a.prazo_limite).getTime() - new Date(b.prazo_limite).getTime());
+
+    const urgentIds = new Set(urgent.map((of: any) => of.id));
+
+    const oldest = allOfs
+      .filter((of: any) => !urgentIds.has(of.id))
+      .sort((a: any, b: any) => new Date(a.criado_em).getTime() - new Date(b.criado_em).getTime());
+
+    return [...urgent, ...oldest].slice(0, limit);
   }
 }
+
 
 /**
  * Fetch rápido das OFs com prazo_limite nos próximos 7 dias (ainda abertas).

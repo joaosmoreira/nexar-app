@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { fetchDashboardMetrics, fetchOldestOpenOFs } from '../services/api';
+import { fetchDashboardMetrics, fetchAlertOFs } from '../services/api';
 import { useAppStore } from '../store/useAppStore';
 import { LayoutGrid, Layers, Archive, Factory, AlertTriangle, Clock, CalendarClock } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -28,7 +28,7 @@ export function GlobalDashboard() {
     try {
       const [data, oldest] = await Promise.all([
         fetchDashboardMetrics(isArchiveMode),
-        isArchiveMode ? Promise.resolve([]) : fetchOldestOpenOFs(5),
+        isArchiveMode ? Promise.resolve([]) : fetchAlertOFs(6),
       ]);
       setMetrics(data);
       setOldestOfs(oldest);
@@ -71,7 +71,7 @@ export function GlobalDashboard() {
               Ordens em Aberto — Aguardam Despacho
             </h2>
           </div>
-          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+          <div className="grid gap-3 grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
             {oldestOfs.map((of: any) => {
               const ageDays = Math.floor((Date.now() - new Date(of.criado_em).getTime()) / (1000 * 60 * 60 * 24));
               const projNome = of.projectos?.nome || '';
