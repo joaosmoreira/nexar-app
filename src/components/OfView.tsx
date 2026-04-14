@@ -161,8 +161,8 @@ export function OfView({ ofId }: { ofId: number }) {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async (silent = false) => {
+    if (!silent) setLoading(true);
     const { data: oData } = await supabase
       .from('ordens_fabrico')
       .select('*, projectos(nome)')
@@ -177,10 +177,18 @@ export function OfView({ ofId }: { ofId: number }) {
     }
     const tData = await fetchTarefasByOf(ofId);
     setTarefas(tData);
-    setLoading(false);
+    if (!silent) setLoading(false);
   };
 
-  useEffect(() => { loadData(); }, [ofId, dataVersion]);
+  const firstLoad = useRef(true);
+  const previousOfId = useRef(ofId);
+
+  useEffect(() => { 
+    const isSilent = previousOfId.current === ofId && !firstLoad.current;
+    loadData(isSilent);
+    firstLoad.current = false;
+    previousOfId.current = ofId;
+  }, [ofId, dataVersion]);
 
   const handleToggle = async (t: Tarefa) => {
     setTarefas(prev => prev.map(task => task.id === t.id ? { ...task, concluido: !t.concluido } : task));
