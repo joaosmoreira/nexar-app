@@ -397,13 +397,13 @@ export function Sidebar() {
             {isArchiveMode ? "PROJETOS ARQUIVADOS" : "PROJETOS ATIVOS"}
           </span>
           {!isArchiveMode && (
-            <div className="flex gap-2">
+            <div className="flex gap-1.5">
               <button 
                 onClick={() => setModalOpen(true)}
-                className="text-sky-400 hover:text-sky-300 bg-sky-500/10 hover:bg-sky-500/20 active:scale-90 p-1 rounded transition-all" 
-                title="Novo Projeto"
+                className="flex items-center gap-1 text-xs font-semibold text-white bg-sky-600 hover:bg-sky-500 active:scale-95 px-2.5 py-1 rounded-md transition-all shadow-sm shadow-sky-900/40" 
+                title="Nova Obra"
               >
-                <Plus size={14} />
+                <Plus size={12} /> Nova Obra
               </button>
               <button 
                 onClick={() => loadProjetos(false)}
