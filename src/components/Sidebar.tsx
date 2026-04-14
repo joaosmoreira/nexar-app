@@ -242,7 +242,7 @@ export function Sidebar() {
 
   const [width, setWidth] = useState(() => {
     const saved = localStorage.getItem('nexar-sidebar-width');
-    return saved ? Math.max(288, Math.min(450, parseInt(saved, 10))) : 288;
+    return saved ? Math.max(288, Math.min(400, parseInt(saved, 10))) : 288;
   });
   const [isResizing, setIsResizing] = useState(false);
   const navRef = useRef<HTMLDivElement>(null);
@@ -252,7 +252,7 @@ export function Sidebar() {
       if (!isResizing) return;
       let newWidth = e.clientX;
       if (newWidth < 288) newWidth = 288;
-      if (newWidth > 450) newWidth = 450;
+      if (newWidth > 400) newWidth = 400;
       setWidth(newWidth);
     };
 
