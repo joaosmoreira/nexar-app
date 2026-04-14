@@ -239,6 +239,17 @@ export function OfView({ ofId }: { ofId: number }) {
     }
   };
 
+  const handleRemovePrazo = async () => {
+    try {
+      await updateOrdemFabrico(ofId, { prazo_limite: null });
+      setPrazoLimite(null);
+      setEditingPrazo(false);
+      toast.success('Prazo removido.');
+    } catch (e: any) {
+      toast.error('Erro ao remover prazo: ' + e.message);
+    }
+  };
+
   const prazoInfo = (() => {
     if (!prazoLimite) return null;
     const d = new Date(prazoLimite);
@@ -397,75 +408,85 @@ export function OfView({ ofId }: { ofId: number }) {
         </div>
       </div>
 
-      {/* PROGRESS BAR */}
-      <div className="bg-slate-800/50 border border-slate-700 p-6 rounded-2xl mb-8">
-        <div className="flex justify-between items-end mb-3">
-          <div className="text-sm font-medium text-slate-300">Progresso Operacional</div>
-          <div className="text-xl font-bold text-sky-400">{progresso}%</div>
+      {/* PROGRESS BAR + PRAZO LIMITE (lado a lado) */}
+      <div className="flex gap-4 mb-8 items-stretch">
+        {/* Barra de progresso (flex-1) */}
+        <div className="flex-1 bg-slate-800/50 border border-slate-700 p-6 rounded-2xl">
+          <div className="flex justify-between items-end mb-3">
+            <div className="text-sm font-medium text-slate-300">Progresso Operacional</div>
+            <div className="text-xl font-bold text-sky-400">{progresso}%</div>
+          </div>
+          <div className="w-full bg-slate-900 rounded-full h-3 border border-slate-700 flex items-center overflow-hidden">
+            <div className="h-full bg-gradient-to-r from-sky-500 to-sky-400 transition-all duration-1000 ease-out" style={{ width: `${progresso}%` }} />
+          </div>
         </div>
-        <div className="w-full bg-slate-900 rounded-full h-3 border border-slate-700 flex items-center overflow-hidden">
-          <div className="h-full bg-gradient-to-r from-sky-500 to-sky-400 transition-all duration-1000 ease-out" style={{ width: `${progresso}%` }} />
-        </div>
-      </div>
 
-      {/* PRAZO LIMITE */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-2">
-          <label className="text-sm font-medium text-slate-400">Prazo Limite</label>
-          {!editingPrazo && (
+        {/* Prazo Limite (caixa compacta) */}
+        <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-5 flex flex-col justify-between min-w-[200px] max-w-[240px] shrink-0">
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-sm font-medium text-slate-300">Prazo Limite</div>
+            {!editingPrazo && (
+              <button
+                onClick={() => { setPrazoEditValue(prazoLimite ? prazoLimite.split('T')[0] : ''); setEditingPrazo(true); }}
+                className="p-1 rounded text-slate-500 hover:text-sky-400 hover:bg-sky-500/10 transition-all"
+                title={prazoLimite ? 'Alterar prazo' : 'Definir prazo'}
+              >
+                <Pencil size={13} />
+              </button>
+            )}
+          </div>
+
+          {editingPrazo ? (
+            <div className="flex flex-col gap-2">
+              <div className="relative">
+                <CalendarClock size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                <input
+                  autoFocus
+                  type="date"
+                  value={prazoEditValue}
+                  onChange={e => setPrazoEditValue(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded-lg pl-8 pr-2 py-2 text-sm focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none transition-all"
+                />
+              </div>
+              <div className="flex gap-1.5">
+                <button onClick={handleSavePrazo} className="flex-1 p-1.5 rounded-lg bg-sky-500/20 text-sky-400 hover:bg-sky-500/30 active:scale-95 transition-all text-xs font-medium flex items-center justify-center gap-1">
+                  <Check size={12} /> Guardar
+                </button>
+                {prazoLimite && (
+                  <button onClick={handleRemovePrazo} className="p-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 active:scale-95 transition-all" title="Remover prazo">
+                    <Trash2 size={13} />
+                  </button>
+                )}
+                <button onClick={() => setEditingPrazo(false)} className="p-1.5 rounded-lg bg-slate-700/50 text-slate-400 hover:bg-slate-700 active:scale-95 transition-all" title="Cancelar">
+                  <X size={13} />
+                </button>
+              </div>
+            </div>
+          ) : prazoInfo ? (
+            <div>
+              <div className={cn('flex items-center gap-1.5 mb-1.5', prazoInfo.color)}>
+                {prazoInfo.icon === 'red' || prazoInfo.icon === 'amber'
+                  ? <AlertTriangle size={14} />
+                  : <CalendarClock size={14} />
+                }
+                <span className="text-sm font-semibold">{prazoInfo.label}</span>
+              </div>
+              <span className={cn(
+                'text-xs font-bold px-2 py-0.5 rounded-md',
+                prazoInfo.icon === 'red'   ? 'bg-red-500/20 text-red-400' :
+                prazoInfo.icon === 'amber' ? 'bg-amber-500/20 text-amber-400' :
+                'bg-sky-500/20 text-sky-400'
+              )}>{prazoInfo.badge}</span>
+            </div>
+          ) : (
             <button
-              onClick={() => { setPrazoEditValue(prazoLimite ? prazoLimite.split('T')[0] : ''); setEditingPrazo(true); }}
-              className="text-xs text-slate-500 hover:text-sky-400 transition-colors flex items-center gap-1"
+              onClick={() => { setPrazoEditValue(''); setEditingPrazo(true); }}
+              className="flex items-center gap-1.5 text-xs text-slate-600 hover:text-sky-400 transition-colors"
             >
-              <Pencil size={11} /> {prazoLimite ? 'Alterar' : 'Definir prazo'}
+              <CalendarClock size={13} /> Definir prazo...
             </button>
           )}
         </div>
-
-        {editingPrazo ? (
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1">
-              <CalendarClock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
-              <input
-                autoFocus
-                type="date"
-                value={prazoEditValue}
-                onChange={e => setPrazoEditValue(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded-lg pl-9 pr-3 py-2.5 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none transition-all"
-              />
-            </div>
-            <button onClick={handleSavePrazo} className="p-2.5 rounded-lg bg-sky-500/20 text-sky-400 hover:bg-sky-500/30 active:scale-90 transition-all" title="Guardar">
-              <Check size={16} />
-            </button>
-            {prazoLimite && (
-              <button onClick={() => { setPrazoEditValue(''); handleSavePrazo(); }} className="p-2.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 active:scale-90 transition-all" title="Remover prazo">
-                <Trash2 size={16} />
-              </button>
-            )}
-            <button onClick={() => setEditingPrazo(false)} className="p-2.5 rounded-lg bg-slate-700/50 text-slate-400 hover:bg-slate-700 active:scale-90 transition-all" title="Cancelar">
-              <X size={16} />
-            </button>
-          </div>
-        ) : prazoInfo ? (
-          <div className={cn('flex items-center gap-3 p-3 rounded-xl border', prazoInfo.bg, prazoInfo.border)}>
-            {prazoInfo.icon === 'red' || prazoInfo.icon === 'amber'
-              ? <AlertTriangle size={16} className={prazoInfo.color} />
-              : <CalendarClock size={16} className={prazoInfo.color} />
-            }
-            <div className="flex-1">
-              <div className={cn('text-sm font-medium', prazoInfo.color)}>{prazoInfo.label}</div>
-              <div className="text-[10px] text-slate-500 uppercase tracking-wider mt-0.5">Prazo de entrega</div>
-            </div>
-            <span className={cn(
-              'text-xs font-bold px-2 py-1 rounded-lg',
-              prazoInfo.icon === 'red' ? 'bg-red-500/20 text-red-400' :
-              prazoInfo.icon === 'amber' ? 'bg-amber-500/20 text-amber-400' :
-              'bg-sky-500/20 text-sky-400'
-            )}>{prazoInfo.badge}</span>
-          </div>
-        ) : (
-          <div className="text-sm text-slate-600 italic">Sem prazo definido</div>
-        )}
       </div>
 
       {/* NOTAS DA OF */}

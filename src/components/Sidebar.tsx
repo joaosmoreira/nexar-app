@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAppStore } from '../store/useAppStore';
-import { fetchProjetos, fetchOfsByProjeto, createProjeto, fetchProjetosArquivados, fetchOfsWithDeadlineSoon, Projeto, OrdemFabrico } from '../services/api';
+import { fetchProjetos, fetchOfsByProjeto, createProjeto, fetchProjetosArquivados, fetchOfsWithDeadlineSoon, fetchProjectsCompletionStatus, Projeto, OrdemFabrico } from '../services/api';
 import { Folder, FileCog, Layers, Plus, Archive, AlertTriangle, CheckCircle2, Search, LogOut, User, Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { cn } from '../lib/utils';
@@ -13,7 +13,8 @@ const DEADLINE_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 horas
 
 interface DeadlineCache {
   fetchedAt: number;
-  projectIds: number[]; // IDs dos projetos com pelo menos 1 OF c/ prazo < 7 dias
+  projectIds: number[];          // OFs com prazo < 7 dias
+  completedProjectIds: number[]; // Projetos com todas as OFs concluídas
 }
 
 function readDeadlineCache(): DeadlineCache | null {
@@ -26,26 +27,29 @@ function readDeadlineCache(): DeadlineCache | null {
   }
 }
 
-function writeDeadlineCache(projectIds: number[]) {
-  const entry: DeadlineCache = { fetchedAt: Date.now(), projectIds };
+function writeDeadlineCache(projectIds: number[], completedProjectIds: number[]) {
+  const entry: DeadlineCache = { fetchedAt: Date.now(), projectIds, completedProjectIds };
   localStorage.setItem(DEADLINE_CACHE_KEY, JSON.stringify(entry));
 }
 
-async function getDeadlineProjectIds(): Promise<number[]> {
+async function getProjectsStatusCache(): Promise<{ deadlineIds: number[]; completedIds: number[] }> {
   const cached = readDeadlineCache();
   if (cached && Date.now() - cached.fetchedAt < DEADLINE_CACHE_TTL_MS) {
-    return cached.projectIds;
+    return { deadlineIds: cached.projectIds, completedIds: cached.completedProjectIds || [] };
   }
-  // Cache expirada ou inexistente — vai buscar
-  const ofs = await fetchOfsWithDeadlineSoon();
-  const ids = [...new Set(ofs.map(o => o.projeto_id))];
-  writeDeadlineCache(ids);
-  return ids;
+  // Cache expirada ou inexistente — vai buscar ambos em paralelo
+  const [ofs, completedIds] = await Promise.all([
+    fetchOfsWithDeadlineSoon(),
+    fetchProjectsCompletionStatus(),
+  ]);
+  const deadlineIds = [...new Set(ofs.map(o => o.projeto_id))];
+  writeDeadlineCache(deadlineIds, completedIds);
+  return { deadlineIds, completedIds };
 }
 
 // ─── ProjectItem ──────────────────────────────────────────────────────────────
 
-function ProjectItem({ projeto, deadlineProjectIds }: { projeto: Projeto; deadlineProjectIds: number[] }) {
+function ProjectItem({ projeto, deadlineProjectIds, completedProjectIds }: { projeto: Projeto; deadlineProjectIds: number[]; completedProjectIds: number[] }) {
   const { selectedProjectId, selectedOfId, setSelectedProject } = useAppStore();
   const [ofs, setOfs] = useState<OrdemFabrico[]>([]);
   const [loading, setLoading] = useState(false);
@@ -81,12 +85,15 @@ function ProjectItem({ projeto, deadlineProjectIds }: { projeto: Projeto; deadli
   const [ref, ...rest] = projeto.nome.split(" - ");
   const projNameOnly = rest.length > 0 ? rest.join(" - ") : (projeto.cliente || projeto.nome);
 
-  // Determinar ícone da pasta
-  const allDone = ofs.length > 0 && ofs.every((o: any) => o.progress === 100);
+  // Determinar ícone da pasta — completedProjectIds já vem do cache (sem depender do isExpanded)
+  const allDone = completedProjectIds.includes(projeto.id);
+  // Atualiza também quando o projeto está expandido e as OFs foram carregadas localmente
+  const allDoneLocal = ofs.length > 0 && ofs.every((o: any) => o.progress === 100);
+  const isCompleted = allDone || (isExpanded && allDoneLocal);
   const hasDeadlineSoon = deadlineProjectIds.includes(projeto.id);
 
   let folderIcon;
-  if (isExpanded && allDone) {
+  if (isCompleted) {
     folderIcon = <CheckCircle2 size={18} className="shrink-0 text-emerald-500" />;
   } else if (hasDeadlineSoon) {
     folderIcon = <AlertTriangle size={18} className={cn("shrink-0 transition-colors", isSelected ? "text-amber-400" : "text-amber-500")} />;
@@ -187,6 +194,7 @@ export function Sidebar() {
   const [projetos, setProjetos] = useState<Projeto[]>([]);
   const [loading, setLoading] = useState(true);
   const [deadlineProjectIds, setDeadlineProjectIds] = useState<number[]>([]);
+  const [completedProjectIds, setCompletedProjectIds] = useState<number[]>([]);
 
   const loadProjetos = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -201,10 +209,13 @@ export function Sidebar() {
     if (!silent) setLoading(false);
   };
 
-  // Carregar cache de prazos — apenas no arranque e depois 1x/dia
+  // Carregar cache de prazos e projetos concluídos — apenas no arranque e depois 1x/dia
   useEffect(() => {
-    getDeadlineProjectIds()
-      .then(ids => setDeadlineProjectIds(ids))
+    getProjectsStatusCache()
+      .then(({ deadlineIds, completedIds }) => {
+        setDeadlineProjectIds(deadlineIds);
+        setCompletedProjectIds(completedIds);
+      })
       .catch(() => {}); // silencioso — não é crítico
   }, []);
 
@@ -237,7 +248,7 @@ export function Sidebar() {
       if (!isResizing) return;
       let newWidth = e.clientX;
       if (newWidth < 288) newWidth = 288;
-      if (newWidth > 600) newWidth = 600;
+      if (newWidth > 500) newWidth = 500;
       setWidth(newWidth);
     };
 
@@ -407,13 +418,13 @@ export function Sidebar() {
                 <div className="px-3 py-1 mb-1">
                   <span className="text-[9px] font-bold tracking-widest uppercase text-slate-600">Trabalhos Gerais</span>
                 </div>
-                <ProjectItem key={gs0000.id} projeto={gs0000} deadlineProjectIds={deadlineProjectIds} />
+                <ProjectItem key={gs0000.id} projeto={gs0000} deadlineProjectIds={deadlineProjectIds} completedProjectIds={completedProjectIds} />
                 {outrosProjetos.length > 0 && <div className="my-2 border-t border-slate-800/60" />}
               </div>
             )}
             {/* Restantes projetos */}
             {outrosProjetos.map(p => (
-              <ProjectItem key={p.id} projeto={p} deadlineProjectIds={deadlineProjectIds} />
+              <ProjectItem key={p.id} projeto={p} deadlineProjectIds={deadlineProjectIds} completedProjectIds={completedProjectIds} />
             ))}
           </>
         )}

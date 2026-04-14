@@ -226,6 +226,39 @@ export async function fetchOfsWithDeadlineSoon(): Promise<{ projeto_id: number; 
 }
 
 /**
+ * Devolve os IDs de projetos onde TODAS as OFs têm TODAS as tarefas concluídas.
+ * Cacheado externamente — chamado apenas uma vez por sessão/dia.
+ */
+export async function fetchProjectsCompletionStatus(): Promise<number[]> {
+  if (!isOnline()) return [];
+  const { data, error } = await supabase
+    .from('ordens_fabrico')
+    .select('projeto_id, tarefas(concluido)');
+
+  if (error || !data) return [];
+
+  // Agrupa por projeto_id e verifica se todas as OFs estão totalmente concluídas
+  const byProject = new Map<number, boolean>();
+  for (const of_ of data as any[]) {
+    const projId = of_.projeto_id;
+    const total = of_.tarefas?.length || 0;
+    const allDone = total > 0 && (of_.tarefas as any[]).every((t: any) => t.concluido);
+    const prev = byProject.get(projId);
+    if (prev === undefined) {
+      byProject.set(projId, allDone);
+    } else {
+      // Se qualquer OF não estiver concluída, o projeto não está concluído
+      if (!allDone) byProject.set(projId, false);
+    }
+  }
+
+  return [...byProject.entries()]
+    .filter(([, done]) => done)
+    .map(([id]) => id);
+}
+
+
+/**
  * Devolve o próximo número sequencial para OFs do projeto GS0000.
  * Formato: 00000001, 00000002, ...
  */
