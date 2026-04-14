@@ -150,7 +150,7 @@ export function GlobalSearchModal() {
         {/* Footer info */}
         <div className="bg-slate-950 px-4 py-2 border-t border-slate-800 text-[10px] text-slate-500 flex justify-between font-medium">
            <span>Pesquisa</span>
-           <span>Pressione ESC para fechar ou clique [CMD + K] para abrir e fechar a qualquer hora</span>
+           <span>Pressione ESC para fechar ou clique [{navigator.userAgent.toLowerCase().includes('mac') ? 'CMD' : 'CTRL'} + K] para abrir e fechar a qualquer hora</span>
         </div>
       </div>
     </div>

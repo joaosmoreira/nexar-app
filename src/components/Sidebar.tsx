@@ -384,7 +384,9 @@ export function Sidebar() {
         >
           <Search size={16} className="group-hover:text-sky-400 transition-colors shrink-0" />
           <span className="flex-1 text-left text-[13px]">Pesquisa...</span>
-          <span className="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded text-slate-500 font-medium tracking-widest shrink-0 hidden lg:block">CMD+K</span>
+          <span className="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded text-slate-500 font-medium tracking-widest shrink-0 hidden lg:block">
+            {navigator.userAgent.toLowerCase().includes('mac') ? 'CMD+K' : 'CTRL+K'}
+          </span>
         </button>
       </div>
 
