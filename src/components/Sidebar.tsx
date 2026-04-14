@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { fetchProjetos, fetchOfsByProjeto, createProjeto, fetchProjetosArquivados, fetchOfsWithDeadlineSoon, fetchProjectsCompletionStatus, Projeto, OrdemFabrico } from '../services/api';
 import { Folder, FileCog, Layers, Plus, Archive, AlertTriangle, CheckCircle2, Search, LogOut, User, Wifi, WifiOff, RefreshCw } from 'lucide-react';
@@ -21,7 +21,10 @@ function readDeadlineCache(): DeadlineCache | null {
   try {
     const raw = localStorage.getItem(DEADLINE_CACHE_KEY);
     if (!raw) return null;
-    return JSON.parse(raw) as DeadlineCache;
+    const parsed = JSON.parse(raw) as DeadlineCache;
+    // Invalida o cache se o campo completedProjectIds estiver em falta (formato antigo)
+    if (!Array.isArray(parsed.completedProjectIds)) return null;
+    return parsed;
   } catch {
     return null;
   }
@@ -239,16 +242,28 @@ export function Sidebar() {
 
   const [width, setWidth] = useState(() => {
     const saved = localStorage.getItem('nexar-sidebar-width');
-    return saved ? Math.max(288, parseInt(saved, 10)) : 288;
+    return saved ? Math.max(288, Math.min(400, parseInt(saved, 10))) : 288;
   });
   const [isResizing, setIsResizing] = useState(false);
+  const navRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isResizing) return;
       let newWidth = e.clientX;
       if (newWidth < 288) newWidth = 288;
-      if (newWidth > 500) newWidth = 500;
+      if (newWidth > 400) newWidth = 400;
+
+      // Bloqueia expansão quando o conteúdo já está todo visível (sem overflow)
+      const nav = navRef.current;
+      if (nav && newWidth > width) {
+        // scrollWidth > offsetWidth → ainda há texto truncado → permite expandir
+        // scrollWidth <= offsetWidth → tudo cabe → bloqueia
+        if (nav.scrollWidth <= nav.offsetWidth) {
+          return; // não actualiza — conteúdo já cabe
+        }
+      }
+
       setWidth(newWidth);
     };
 
@@ -376,7 +391,7 @@ export function Sidebar() {
       </div>
 
       {/* Lista de Projetos (Nav) */}
-      <div className="flex-1 overflow-y-auto p-3 p-b-20">
+      <div ref={navRef} className="flex-1 overflow-y-auto p-3 pb-20">
         <div className="flex items-center justify-between px-3 py-2 mb-2">
           <span className="text-xs font-medium text-slate-400 tracking-wider">
             {isArchiveMode ? "PROJETOS ARQUIVADOS" : "PROJETOS ATIVOS"}
