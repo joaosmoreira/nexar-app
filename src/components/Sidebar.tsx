@@ -222,8 +222,17 @@ export function Sidebar() {
       .catch(() => {}); // silencioso — não é crítico
   }, []);
 
+  const firstLoad = useRef(true);
+  const previousArchiveMode = useRef(isArchiveMode);
+
   useEffect(() => {
-    loadProjetos(false);
+    // Apenas mostramos o loader se houver mudança de view (ex: Archive Mode) ou no 1º load
+    const isSilent = previousArchiveMode.current === isArchiveMode && !firstLoad.current;
+    
+    loadProjetos(isSilent);
+    
+    firstLoad.current = false;
+    previousArchiveMode.current = isArchiveMode;
 
     // Ciclo de sincronização automática de 60 em 60 segundos
     const syncInterval = setInterval(() => {
