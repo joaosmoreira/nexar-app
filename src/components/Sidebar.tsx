@@ -392,22 +392,22 @@ export function Sidebar() {
 
       {/* Lista de Projetos (Nav) */}
       <div ref={navRef} className="flex-1 overflow-y-auto p-3 pb-20">
-        <div className="flex items-center justify-between px-3 py-2 mb-2">
-          <span className="text-xs font-medium text-slate-400 tracking-wider">
+        <div className="flex items-center justify-between px-3 py-2 mb-2 gap-2">
+          <span className="text-xs font-medium text-slate-400 tracking-wider shrink-0 whitespace-nowrap">
             {isArchiveMode ? "PROJETOS ARQUIVADOS" : "PROJETOS ATIVOS"}
           </span>
           {!isArchiveMode && (
-            <div className="flex gap-1.5">
+            <div className="flex gap-1.5 shrink-0">
               <button 
                 onClick={() => setModalOpen(true)}
-                className="flex items-center gap-1 text-xs font-semibold text-white bg-sky-600 hover:bg-sky-500 active:scale-95 px-2.5 py-1 rounded-md transition-all shadow-sm shadow-sky-900/40" 
+                className="flex items-center gap-1 text-xs font-medium text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 active:scale-95 px-2 py-1 rounded-lg transition-all border border-emerald-500/20 whitespace-nowrap" 
                 title="Nova Obra"
               >
                 <Plus size={12} /> Nova Obra
               </button>
               <button 
                 onClick={() => loadProjetos(false)}
-                className="text-slate-500 hover:text-slate-300 p-1 active:scale-90 transition-all" 
+                className="text-slate-500 hover:text-slate-300 p-1 active:scale-90 transition-all shrink-0" 
                 title="Atualizar"
               >
                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21v-5h5"/></svg>
