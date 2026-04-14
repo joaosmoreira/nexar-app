@@ -9,7 +9,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [macos-latest, windows-latest]
+        platform: [windows-latest]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout repository
@@ -32,42 +32,19 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          APPLE_SIGNING_IDENTITY: ${{ matrix.platform == 'macos-latest' && '-' || '' }}
         with:
-          tagName: v${{ github.run_number }}
-          releaseName: 'Nexar v${{ github.run_number }}'
-          releaseBody: 'Nova versão do Nexar Work Manager (Windows e macOS).'
+          tagName: v1.0.${{ github.run_number }}
+          releaseName: 'Nexar HUB v1.0.${{ github.run_number }}'
+          releaseBody: 'Nova versão do Nexar HUB Work Manager (Windows).'
           releaseDraft: false
           prerelease: false
 
-      # Processamento específico para macOS (Deep Sign e Repackage)
-      - name: Deep ad-hoc sign macOS app
-        if: matrix.platform == 'macos-latest'
-        run: |
-          APP=$(find src-tauri/target/release/bundle/macos -name "*.app" | head -1)
-          find "$APP" -type f \( -name "*.dylib" -o -name "*.so" -o -perm +0111 \) | while read f; do
-            codesign --force --sign - "$f" 2>/dev/null || true
-          done
-          codesign --force --deep --sign - "$APP"
-          
-      - name: Repackage DMG with signed app
-        if: matrix.platform == 'macos-latest'
-        run: |
-          APP=$(find src-tauri/target/release/bundle/macos -name "*.app" | head -1)
-          DMG=$(find src-tauri/target/release/bundle/dmg -name "*.dmg" | head -1)
-          TMP_DIR=$(mktemp -d)
-          mkdir -p "$TMP_DIR/staging"
-          cp -R "$APP" "$TMP_DIR/staging/"
-          hdiutil create -volname "Nexar HUB" -srcfolder "$TMP_DIR/staging" -ov -format UDZO "$DMG"
-          rm -rf "$TMP_DIR"
-
-      # Passo de Upload Unificado (Remove o "if: macos-latest")
-      - name: Upload Artifacts to Release
+      # Upload de artefactos Windows
+      - name: Upload Windows Artifacts to Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ github.run_number }}
+          tag_name: v1.0.${{ github.run_number }}
           files: |
-            src-tauri/target/release/bundle/dmg/*.dmg
             src-tauri/target/release/bundle/msi/*.msi
             src-tauri/target/release/bundle/nsis/*.exe
         env:

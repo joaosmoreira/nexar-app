@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Nexar HUB",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "identifier": "com.ctk.nexar",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -33,6 +33,14 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      },
+      "wix": {
+        "upgradeCode": "B3F7A2D1-4E8C-4A1F-9C3B-2D5E6F7A8B9C"
+      }
+    }
   }
 }
