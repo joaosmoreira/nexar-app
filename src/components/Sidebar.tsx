@@ -1,12 +1,58 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../store/useAppStore';
-import { fetchProjetos, fetchOfsByProjeto, createProjeto, fetchProjetosArquivados, Projeto, OrdemFabrico } from '../services/api';
+import { fetchProjetos, fetchOfsByProjeto, createProjeto, fetchProjetosArquivados, fetchOfsWithDeadlineSoon, fetchProjectsCompletionStatus, Projeto, OrdemFabrico } from '../services/api';
 import { Folder, FileCog, Layers, Plus, Archive, AlertTriangle, CheckCircle2, Search, LogOut, User, Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { cn } from '../lib/utils';
 import { Modal } from './Modal';
+import { toast } from 'sonner';
 
-function ProjectItem({ projeto }: { projeto: Projeto }) {
+// ─── Cache de prazos próximos (atualizado 1x/dia ou no arranque) ────────────
+const DEADLINE_CACHE_KEY = 'nexar-deadline-cache';
+const DEADLINE_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 horas
+
+interface DeadlineCache {
+  fetchedAt: number;
+  projectIds: number[];          // OFs com prazo < 7 dias
+  completedProjectIds: number[]; // Projetos com todas as OFs concluídas
+}
+
+function readDeadlineCache(): DeadlineCache | null {
+  try {
+    const raw = localStorage.getItem(DEADLINE_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as DeadlineCache;
+    // Invalida o cache se o campo completedProjectIds estiver em falta (formato antigo)
+    if (!Array.isArray(parsed.completedProjectIds)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeDeadlineCache(projectIds: number[], completedProjectIds: number[]) {
+  const entry: DeadlineCache = { fetchedAt: Date.now(), projectIds, completedProjectIds };
+  localStorage.setItem(DEADLINE_CACHE_KEY, JSON.stringify(entry));
+}
+
+async function getProjectsStatusCache(): Promise<{ deadlineIds: number[]; completedIds: number[] }> {
+  const cached = readDeadlineCache();
+  if (cached && Date.now() - cached.fetchedAt < DEADLINE_CACHE_TTL_MS) {
+    return { deadlineIds: cached.projectIds, completedIds: cached.completedProjectIds || [] };
+  }
+  // Cache expirada ou inexistente — vai buscar ambos em paralelo
+  const [ofs, completedIds] = await Promise.all([
+    fetchOfsWithDeadlineSoon(),
+    fetchProjectsCompletionStatus(),
+  ]);
+  const deadlineIds = [...new Set(ofs.map(o => o.projeto_id))];
+  writeDeadlineCache(deadlineIds, completedIds);
+  return { deadlineIds, completedIds };
+}
+
+// ─── ProjectItem ──────────────────────────────────────────────────────────────
+
+function ProjectItem({ projeto, deadlineProjectIds, completedProjectIds }: { projeto: Projeto; deadlineProjectIds: number[]; completedProjectIds: number[] }) {
   const { selectedProjectId, selectedOfId, setSelectedProject } = useAppStore();
   const [ofs, setOfs] = useState<OrdemFabrico[]>([]);
   const [loading, setLoading] = useState(false);
@@ -42,6 +88,22 @@ function ProjectItem({ projeto }: { projeto: Projeto }) {
   const [ref, ...rest] = projeto.nome.split(" - ");
   const projNameOnly = rest.length > 0 ? rest.join(" - ") : (projeto.cliente || projeto.nome);
 
+  // Determinar ícone da pasta — completedProjectIds já vem do cache (sem depender do isExpanded)
+  const allDone = completedProjectIds.includes(projeto.id);
+  // Atualiza também quando o projeto está expandido e as OFs foram carregadas localmente
+  const allDoneLocal = ofs.length > 0 && ofs.every((o: any) => o.progress === 100);
+  const isCompleted = allDone || (isExpanded && allDoneLocal);
+  const hasDeadlineSoon = deadlineProjectIds.includes(projeto.id);
+
+  let folderIcon;
+  if (isCompleted) {
+    folderIcon = <CheckCircle2 size={18} className="shrink-0 text-emerald-500" />;
+  } else if (hasDeadlineSoon) {
+    folderIcon = <AlertTriangle size={18} className={cn("shrink-0 transition-colors", isSelected ? "text-amber-400" : "text-amber-500")} />;
+  } else {
+    folderIcon = <Folder size={18} className={cn("shrink-0 transition-colors", isSelected ? "text-sky-400" : "text-sky-500/50")} />;
+  }
+
   return (
     <div className="mb-2">
       <button
@@ -51,7 +113,7 @@ function ProjectItem({ projeto }: { projeto: Projeto }) {
           isSelected ? "bg-slate-800 text-slate-100" : "hover:bg-slate-800/50 text-slate-400"
         )}
       >
-        <Folder size={18} className={cn("shrink-0 transition-colors", isSelected ? "text-sky-400" : "text-sky-500/50")} />
+        {folderIcon}
         <div className="flex-1 text-left truncate">
            <div className="text-[10px] font-bold tracking-widest uppercase text-sky-500/70 mb-0.5">{ref}</div>
            <div className="text-[13px] font-medium leading-tight truncate text-slate-300 group-hover:text-slate-100 transition-colors">{projNameOnly}</div>
@@ -86,9 +148,20 @@ function OfItem({ ofData }: { ofData: OrdemFabrico }) {
   const ageMs = Date.now() - new Date(ofData.criado_em).getTime();
   const ageDays = ageMs / (1000 * 60 * 60 * 24);
 
+  // Verificar prazo limite
+  const now = Date.now();
+  const prazoMs = ofData.prazo_limite ? new Date(ofData.prazo_limite).getTime() - now : null;
+  const prazoEmDias = prazoMs !== null ? prazoMs / (1000 * 60 * 60 * 24) : null;
+  const prazoUrgente = prazoEmDias !== null && prazoEmDias <= 7 && prazoEmDias >= 0 && progresso < 100;
+  const prazoExpirado = prazoEmDias !== null && prazoEmDias < 0 && progresso < 100;
+
   let iconToRender;
   if (progresso >= 100) {
      iconToRender = <CheckCircle2 size={16} className="text-emerald-500" />;
+  } else if (prazoExpirado) {
+     iconToRender = <AlertTriangle size={16} className="text-red-500" />;
+  } else if (prazoUrgente) {
+     iconToRender = <AlertTriangle size={16} className="text-amber-400" />;
   } else if (ageDays > 21) {
      iconToRender = <AlertTriangle size={16} className="text-red-500" />;
   } else if (ageDays > 14) {
@@ -120,24 +193,91 @@ function OfItem({ ofData }: { ofData: OrdemFabrico }) {
 }
 
 export function Sidebar() {
-  const { isArchiveMode, setArchiveMode, user, isOnline, isSyncing, lastSyncAt, hasPendingMutations } = useAppStore();
+  const { isArchiveMode, setArchiveMode, user, isOnline, isSyncing, lastSyncAt, hasPendingMutations, dataVersion } = useAppStore();
   const [projetos, setProjetos] = useState<Projeto[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deadlineProjectIds, setDeadlineProjectIds] = useState<number[]>([]);
+  const [completedProjectIds, setCompletedProjectIds] = useState<number[]>([]);
 
-  const loadProjetos = async () => {
-    setLoading(true);
+  const loadProjetos = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const data = isArchiveMode ? await fetchProjetosArquivados() : await fetchProjetos();
       setProjetos(data);
+      // Atualizar a última data de sincronização visual
+      useAppStore.getState().setLastSyncAt(new Date().toISOString());
     } catch (error) {
       console.error("Erro ao carregar projetos:", error);
     }
-    setLoading(false);
+    if (!silent) setLoading(false);
   };
 
+  // Carregar cache de prazos e projetos concluídos — apenas no arranque e depois 1x/dia
   useEffect(() => {
-    loadProjetos();
-  }, [isArchiveMode]); 
+    getProjectsStatusCache()
+      .then(({ deadlineIds, completedIds }) => {
+        setDeadlineProjectIds(deadlineIds);
+        setCompletedProjectIds(completedIds);
+      })
+      .catch(() => {}); // silencioso — não é crítico
+  }, []);
+
+  useEffect(() => {
+    loadProjetos(false);
+
+    // Ciclo de sincronização automática de 60 em 60 segundos
+    const syncInterval = setInterval(() => {
+      const store = useAppStore.getState();
+      // Só faz auto-refresh se estivermos com internet e sem alterações pendentes prioritárias
+      if (store.isOnline && !store.hasPendingMutations) {
+        store.setSyncing(true);
+        loadProjetos(true).finally(() => {
+           store.setSyncing(false);
+        });
+      }
+    }, 60000);
+
+    return () => clearInterval(syncInterval);
+  }, [isArchiveMode, dataVersion]); 
+
+  const [width, setWidth] = useState(() => {
+    const saved = localStorage.getItem('nexar-sidebar-width');
+    return saved ? Math.max(288, Math.min(400, parseInt(saved, 10))) : 288;
+  });
+  const [isResizing, setIsResizing] = useState(false);
+  const navRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing) return;
+      let newWidth = e.clientX;
+      if (newWidth < 288) newWidth = 288;
+      if (newWidth > 400) newWidth = 400;
+      setWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    } else {
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      localStorage.setItem('nexar-sidebar-width', width.toString());
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizing, width]);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [newProjRef, setNewProjRef] = useState("");
@@ -153,13 +293,30 @@ export function Sidebar() {
       setModalOpen(false);
       setNewProjRef("");
       setNewProjCli("");
+      useAppStore.getState().incrementDataVersion();
+      toast.success("Projeto criado com sucesso!");
     } catch (e: any) {
-      alert("Erro ao criar projeto: " + e.message);
+      toast.error("Erro ao criar projeto: " + e.message);
     }
   };
 
+  // Separar GS0000 dos restantes projetos
+  const gs0000 = projetos.find(p => p.nome.startsWith('GS0000'));
+  const outrosProjetos = projetos.filter(p => !p.nome.startsWith('GS0000'));
+
   return (
-    <aside className="w-72 bg-slate-900 border-r border-slate-800 flex flex-col h-full relative">
+    <aside 
+      style={{ width: `${width}px` }}
+      className="bg-slate-900 border-r border-slate-800 flex flex-col h-full relative shrink-0 transition-all duration-0"
+    >
+      <div 
+        onMouseDown={(e) => { e.preventDefault(); setIsResizing(true); }}
+        className={cn(
+          "absolute top-0 right-[-3px] w-1.5 h-full cursor-col-resize z-50 transition-colors",
+          isResizing ? "bg-sky-500" : "hover:bg-sky-500/50"
+        )}
+      />
+
       <Modal isOpen={modalOpen} title="Novo Projeto" onClose={() => setModalOpen(false)}>
         <form onSubmit={handleCreateProjeto} className="flex flex-col gap-4">
           <div>
@@ -189,7 +346,7 @@ export function Sidebar() {
               className="w-full bg-slate-950 border border-slate-800 text-slate-200 rounded-lg p-2.5 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none transition-all"
             />
           </div>
-          <button type="submit" className="mt-2 w-full bg-sky-500 hover:bg-sky-400 text-white font-medium rounded-lg p-3 transition-colors">
+          <button type="submit" className="mt-2 w-full bg-sky-500 hover:bg-sky-400 active:scale-95 text-white font-medium rounded-lg p-3 transition-all duration-150">
             Adicionar Projeto
           </button>
         </form>
@@ -198,7 +355,7 @@ export function Sidebar() {
       {/* HEADER da Sidebar - HUB */}
       <button 
         onClick={() => { setArchiveMode(false); useAppStore.getState().setSelectedProject(null); }}
-        className="p-4 border-b border-slate-800 flex items-center gap-3 w-full text-left hover:bg-slate-800/30 transition-colors group cursor-pointer shrink-0"
+        className="p-4 border-b border-slate-800 flex items-center gap-3 w-full text-left hover:bg-slate-800/30 active:scale-[0.98] transition-all duration-150 group cursor-pointer shrink-0"
         title="Voltar ao HUB Global"
       >
         <div className="w-8 h-8 rounded bg-sky-500/10 flex items-center justify-center border border-sky-500/20 group-hover:bg-sky-500/20 transition-colors">
@@ -214,32 +371,32 @@ export function Sidebar() {
       <div className="px-4 py-3 border-b border-slate-800 shrink-0">
         <button 
            onClick={() => useAppStore.getState().setSearchOpen(true)}
-           className="w-full flex items-center gap-2 bg-slate-950 border border-slate-800 hover:border-sky-500/50 transition-colors text-slate-400 hover:text-slate-200 rounded-lg p-2.5 text-sm outline-none group"
+           className="w-full flex items-center gap-2 bg-slate-950 border border-slate-800 hover:border-sky-500/50 active:scale-[0.98] transition-all text-slate-400 hover:text-slate-200 rounded-lg p-2.5 text-sm outline-none group"
         >
           <Search size={16} className="group-hover:text-sky-400 transition-colors shrink-0" />
-          <span className="flex-1 text-left text-[13px]">Pesquisa Suprema...</span>
+          <span className="flex-1 text-left text-[13px]">Pesquisa...</span>
           <span className="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded text-slate-500 font-medium tracking-widest shrink-0 hidden lg:block">CMD+K</span>
         </button>
       </div>
 
       {/* Lista de Projetos (Nav) */}
-      <div className="flex-1 overflow-y-auto p-3 p-b-20">
-        <div className="flex items-center justify-between px-3 py-2 mb-2">
-          <span className="text-xs font-medium text-slate-400 tracking-wider">
+      <div ref={navRef} className="flex-1 overflow-y-auto p-3 pb-20">
+        <div className="flex items-center justify-between px-3 py-2 mb-2 gap-2">
+          <span className="text-xs font-medium text-slate-400 tracking-wider shrink-0 whitespace-nowrap">
             {isArchiveMode ? "PROJETOS ARQUIVADOS" : "PROJETOS ATIVOS"}
           </span>
           {!isArchiveMode && (
-            <div className="flex gap-2">
+            <div className="flex gap-1.5 shrink-0">
               <button 
                 onClick={() => setModalOpen(true)}
-                className="text-sky-400 hover:text-sky-300 bg-sky-500/10 hover:bg-sky-500/20 p-1 rounded transition-colors" 
-                title="Novo Projeto"
+                className="flex items-center gap-1 text-xs font-medium text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 active:scale-95 px-2 py-1 rounded-lg transition-all border border-emerald-500/20 whitespace-nowrap" 
+                title="Nova Obra"
               >
-                <Plus size={14} />
+                <Plus size={12} /> Nova Obra
               </button>
               <button 
-                onClick={loadProjetos}
-                className="text-slate-500 hover:text-slate-300 p-1" 
+                onClick={() => loadProjetos(false)}
+                className="text-slate-500 hover:text-slate-300 p-1 active:scale-90 transition-all shrink-0" 
                 title="Atualizar"
               >
                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21v-5h5"/></svg>
@@ -258,7 +415,22 @@ export function Sidebar() {
             Nenhum projeto encontrado.
           </div>
         ) : (
-          projetos.map(p => <ProjectItem key={p.id} projeto={p} />)
+          <>
+            {/* GS0000 — sempre fixo no topo */}
+            {gs0000 && (
+              <div className="mb-1">
+                <div className="px-3 py-1 mb-1">
+                  <span className="text-[9px] font-bold tracking-widest uppercase text-slate-600">Trabalhos Gerais</span>
+                </div>
+                <ProjectItem key={gs0000.id} projeto={gs0000} deadlineProjectIds={deadlineProjectIds} completedProjectIds={completedProjectIds} />
+                {outrosProjetos.length > 0 && <div className="my-2 border-t border-slate-800/60" />}
+              </div>
+            )}
+            {/* Restantes projetos */}
+            {outrosProjetos.map(p => (
+              <ProjectItem key={p.id} projeto={p} deadlineProjectIds={deadlineProjectIds} completedProjectIds={completedProjectIds} />
+            ))}
+          </>
         )}
       </div>
 
@@ -295,7 +467,7 @@ export function Sidebar() {
         <button 
           onClick={() => setArchiveMode(!isArchiveMode)}
           className={cn(
-            "w-full flex items-center justify-center gap-2 p-3 rounded-lg transition-colors border text-sm font-medium",
+            "w-full flex items-center justify-center gap-2 p-3 rounded-lg active:scale-[0.98] transition-all duration-150 border text-sm font-medium",
             isArchiveMode 
               ? "bg-amber-500/20 text-amber-400 border-amber-500/30" 
               : "text-slate-400 border-slate-700 hover:bg-slate-800 hover:text-slate-200"
@@ -317,7 +489,7 @@ export function Sidebar() {
            </div>
            <button 
              onClick={() => supabase.auth.signOut()}
-             className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
+             className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 active:scale-90 rounded transition-all"
              title="Terminar Sessão"
            >
              <LogOut size={16} />

@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { createOF, deleteProjeto, arquivarProjeto, updateProjetoNotas, Projeto, OrdemFabrico } from '../services/api';
+import { createOF, deleteProjeto, arquivarProjeto, updateProjetoNotas, fetchNextGs0000OfNumber, Projeto, OrdemFabrico } from '../services/api';
 import { supabase } from '../supabaseClient';
 import { exportToJson, exportProjectExcelWithTasks } from '../lib/exportUtils';
-import { FileDown, PlusCircle, Archive, Trash2 } from 'lucide-react';
+import { FileDown, PlusCircle, Archive, Trash2, CalendarClock } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { cn } from '../lib/utils';
 import { Modal } from './Modal';
+import { toast } from 'sonner';
 
 interface OFWithProgress extends OrdemFabrico {
   tarefas: { concluido: boolean }[];
@@ -13,7 +14,7 @@ interface OFWithProgress extends OrdemFabrico {
 }
 
 export function ProjectView({ projetoId }: { projetoId: number }) {
-
+  const dataVersion = useAppStore(state => state.dataVersion);
   const [projeto, setProjeto] = useState<Projeto | null>(null);
   const [ofs, setOfs] = useState<OFWithProgress[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,11 +67,13 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
 
   useEffect(() => {
     loadData();
-  }, [projetoId]);
+  }, [projetoId, dataVersion]);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [newOfName, setNewOfName] = useState("");
   const [newOfNumber, setNewOfNumber] = useState("");
+  const [newOfPrazo, setNewOfPrazo] = useState("");
+  const [isGs0000, setIsGs0000] = useState(false);
 
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deleteInputName, setDeleteInputName] = useState("");
@@ -95,18 +98,37 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
     return () => clearInterval(interval);
   }, [archiveModalOpen]);
 
+  const openNewOfModal = async () => {
+    const gs = projeto?.nome.startsWith('GS0000') || false;
+    setIsGs0000(gs);
+    setNewOfName("");
+    setNewOfPrazo("");
+    if (gs) {
+      // Preenche automaticamente com o próximo número sequencial
+      const next = await fetchNextGs0000OfNumber(projetoId);
+      setNewOfNumber(next);
+    } else {
+      setNewOfNumber("");
+    }
+    setModalOpen(true);
+  };
+
   const submitOf = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newOfName || !newOfNumber) return;
     try {
       setCreating(true);
-      await createOF(projetoId, newOfName, newOfNumber);
+      const prazoIso = newOfPrazo ? new Date(newOfPrazo).toISOString() : null;
+      await createOF(projetoId, newOfName, newOfNumber, prazoIso);
       await loadData();
       setModalOpen(false);
       setNewOfName("");
       setNewOfNumber("");
+      setNewOfPrazo("");
+      useAppStore.getState().incrementDataVersion();
+      toast.success("Ordem de fabrico criada com sucesso!");
     } catch (e: any) {
-      alert("Erro ao criar: " + e.message);
+      toast.error("Erro ao criar: " + e.message);
     } finally {
       setCreating(false);
     }
@@ -131,8 +153,10 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
     if (archiveProgress < 100) return;
     try {
       await arquivarProjeto(projetoId);
+      useAppStore.getState().incrementDataVersion();
+      toast.success("Projeto arquivado!");
       useAppStore.getState().setSelectedProject(null);
-    } catch(e: any) { alert(e.message) }
+    } catch(e: any) { toast.error(e.message) }
   }
 
   const handleApagar = () => {
@@ -146,10 +170,12 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
     if (deleteInputName === projeto.nome) {
        try {
          await deleteProjeto(projetoId);
+         useAppStore.getState().incrementDataVersion();
+         toast.success("Obra mestre apagada permanentemente.");
          useAppStore.getState().setSelectedProject(null);
-       } catch(e: any) { alert(e.message) }
+       } catch(e: any) { toast.error(e.message) }
     } else {
-       alert("O texto inserido não coincide com o nome da obra. Tente novamente.");
+       toast.error("O texto inserido não coincide com o nome da obra. Tente novamente.");
     }
   }
 
@@ -159,9 +185,21 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
         await updateProjetoNotas(projeto.id, notas);
         setInitialNotas(notas);
       } catch (e: any) {
-        alert("Erro ao guardar notas: " + e.message);
+        toast.error("Erro ao guardar notas: " + e.message);
       }
     }
+  };
+
+  // Helper: formata prazo_limite para exibição na tabela
+  const formatPrazo = (prazo: string | null | undefined) => {
+    if (!prazo) return null;
+    const d = new Date(prazo);
+    const diffMs = d.getTime() - Date.now();
+    const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+    const label = d.toLocaleDateString('pt-PT');
+    if (diffDays < 0) return { label, color: 'text-red-400', badge: 'Expirado' };
+    if (diffDays <= 7) return { label, color: 'text-amber-400', badge: `${diffDays}d` };
+    return { label, color: 'text-slate-400', badge: null };
   };
 
   if (loading) return <div className="p-8 text-slate-400">A carregar projeto...</div>;
@@ -172,7 +210,7 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
       <Modal isOpen={archiveModalOpen} title="Arquivar Projeto" onClose={() => setArchiveModalOpen(false)}>
         <form onSubmit={confirmArquivar} className="flex flex-col gap-4">
           <div className="bg-amber-500/10 border border-amber-500/20 text-amber-500 p-4 rounded-lg text-sm">
-            <span className="font-bold">Aviso:</span> O projeto será movido para o arquivo inativo. Para garantir segurança, por favor aguarde.
+            <span className="font-bold">Aviso:</span> O projeto será movido para o arquivo inativo. As ordens de fabrico e tarefas são mantidas e podem ser consultadas no arquivo. Aguarde para confirmar.
           </div>
           
           <div className="w-full h-2 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
@@ -193,7 +231,7 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
             <button 
               type="submit" 
               disabled={archiveProgress < 100}
-              className="flex-1 text-sm bg-amber-600 hover:bg-amber-500 text-white font-medium rounded-lg p-3 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 text-sm bg-amber-600 hover:bg-amber-500 active:scale-95 text-white font-medium rounded-lg p-3 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
                {archiveProgress < 100 ? `A preparar selagem... ${archiveProgress}%` : "Confirmar Arquivo"}
             </button>
@@ -204,7 +242,7 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
       <Modal isOpen={deleteModalOpen} title="Apagar Obra Mestre" onClose={() => setDeleteModalOpen(false)}>
         <form onSubmit={confirmApagar} className="flex flex-col gap-4">
           <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-lg text-sm">
-            <span className="font-bold">Aviso Crítico:</span> Ao carregar neste botão submeter, fechará literalmente todas as Ordens de Fabrico e as tarefas abaixo destas permanentemente.
+            <span className="font-bold">Aviso Crítico:</span> Esta ação apagará permanentemente a obra e todos os dados associados (OFs e tarefas). Este passo é irreversível.
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-400 mb-1">Para confirmar, escreva o nome exato da obra: <strong className="text-slate-200">"{projeto.nome}"</strong></label>
@@ -218,7 +256,7 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
               className="w-full bg-slate-950 border border-red-900/50 text-slate-200 rounded-lg p-2.5 focus:border-red-500 focus:ring-1 focus:ring-red-500 outline-none transition-all"
             />
           </div>
-          <button type="submit" className="mt-2 w-full bg-red-600 hover:bg-red-500 text-white font-medium rounded-lg p-3 transition-colors">
+          <button type="submit" className="mt-2 w-full bg-red-600 hover:bg-red-500 active:scale-95 text-white font-medium rounded-lg p-3 transition-all">
              Confirmar Eliminação Global
           </button>
         </form>
@@ -229,18 +267,26 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
           <div>
             <label className="block text-sm font-medium text-slate-400 mb-1">Número da OF</label>
             <input 
-              autoFocus
+              autoFocus={!isGs0000}
               type="text" 
               required
               value={newOfNumber}
-              onChange={e => setNewOfNumber(e.target.value)}
+              onChange={e => !isGs0000 && setNewOfNumber(e.target.value)}
+              readOnly={isGs0000}
               placeholder="ex: 2026XXXX"
-              className="w-full bg-slate-950 border border-slate-800 text-slate-200 rounded-lg p-2.5 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none transition-all"
+              className={cn(
+                "w-full bg-slate-950 border border-slate-800 text-slate-200 rounded-lg p-2.5 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none transition-all",
+                isGs0000 && "cursor-not-allowed opacity-60 select-all font-mono tracking-widest"
+              )}
             />
+            {isGs0000 && (
+              <p className="text-[10px] text-slate-500 mt-1">Numeração automática sequencial — GS0000</p>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-400 mb-1">Nome/Descrição da OF</label>
             <input 
+              autoFocus={isGs0000}
               type="text" 
               required
               value={newOfName}
@@ -249,7 +295,22 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
               className="w-full bg-slate-950 border border-slate-800 text-slate-200 rounded-lg p-2.5 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none transition-all"
             />
           </div>
-          <button disabled={creating} type="submit" className="mt-2 w-full bg-sky-500 hover:bg-sky-400 text-white font-medium rounded-lg p-3 transition-colors disabled:opacity-50">
+          <div>
+            <label className="block text-sm font-medium text-slate-400 mb-1">
+              Prazo Limite <span className="text-slate-600 font-normal">(Opcional)</span>
+            </label>
+            <div className="relative">
+              <CalendarClock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+              <input 
+                type="date"
+                value={newOfPrazo}
+                onChange={e => setNewOfPrazo(e.target.value)}
+                min={new Date().toISOString().split('T')[0]}
+                className="w-full bg-slate-950 border border-slate-800 text-slate-200 rounded-lg pl-9 pr-3 py-2.5 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none transition-all"
+              />
+            </div>
+          </div>
+          <button disabled={creating} type="submit" className="mt-2 w-full bg-sky-500 hover:bg-sky-400 active:scale-95 text-white font-medium rounded-lg p-3 transition-all disabled:opacity-50">
             {creating ? "A Criar..." : "Salvar Ordem"}
           </button>
         </form>
@@ -268,16 +329,16 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
         </div>
         <div className="flex gap-2">
           {!projeto.arquivado && (
-            <button onClick={handleArquivar} className="flex items-center gap-2 px-3 py-2 bg-amber-600/10 text-amber-500 hover:bg-amber-600/20 text-sm font-medium rounded-lg transition-colors border border-amber-500/20">
+            <button onClick={handleArquivar} className="flex items-center gap-2 px-3 py-2 bg-amber-600/10 text-amber-500 hover:bg-amber-600/20 active:scale-95 text-sm font-medium rounded-lg transition-all border border-amber-500/20">
               <Archive size={16} /> Arquivar
             </button>
           )}
-          <button onClick={handleApagar} className="flex items-center gap-2 px-3 py-2 bg-red-600/10 text-red-500 hover:bg-red-600/20 text-sm font-medium rounded-lg transition-colors border border-red-500/20">
+          <button onClick={handleApagar} className="flex items-center gap-2 px-3 py-2 bg-red-600/10 text-red-500 hover:bg-red-600/20 active:scale-95 text-sm font-medium rounded-lg transition-all border border-red-500/20">
             <Trash2 size={16} /> Apagar
           </button>
           <div className="w-px bg-slate-700/50 mx-2" />
           <div className="relative group">
-            <button className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium border border-slate-700 rounded-lg transition-colors">
+            <button className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 text-sm font-medium border border-slate-700 rounded-lg transition-all">
               <FileDown size={16} /> Exportar
             </button>
             <div className="absolute right-0 top-full mt-2 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 overflow-hidden flex flex-col">
@@ -293,7 +354,7 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
       </div>
 
       {/* DASHBOARD CARDS */}
-      <div className="grid grid-cols-3 gap-6 mb-8">
+      <div className="grid gap-6 mb-8" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(max(250px, calc(33.333% - 16px)), 1fr))' }}>
         <div className="bg-slate-800/50 border border-slate-700 p-5 rounded-2xl">
           <div className="text-sm text-slate-400 mb-1">Total de OFs</div>
           <div className="text-3xl font-light text-slate-100">{ofs.length}</div>
@@ -344,9 +405,9 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
           <h3 className="text-lg font-medium text-slate-200">Ordens de Fabrico</h3>
           {!projeto.arquivado && (
             <button 
-              onClick={() => setModalOpen(true)}
+              onClick={openNewOfModal}
               disabled={creating}
-              className="flex items-center gap-2 px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 bg-sky-600 hover:bg-sky-500 active:scale-95 text-white text-sm font-medium rounded-lg transition-all disabled:opacity-50"
             >
               <PlusCircle size={16} />
               Nova OF
@@ -365,40 +426,62 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
                 <th className="px-6 py-4">Nº OF</th>
                 <th className="px-6 py-4">Nome</th>
                 <th className="px-6 py-4">Data</th>
+                <th className="px-6 py-4">Prazo</th>
                 <th className="px-6 py-4">Progresso Geral</th>
                 <th className="px-6 py-4 text-right">Ação</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800">
-              {ofs.map((of) => (
-                <tr 
-                  key={of.id} 
-                  onClick={() => useAppStore.getState().setSelectedOf(of.id)}
-                  className="hover:bg-slate-800/80 transition-colors cursor-pointer group"
-                >
-                  <td className="px-6 py-4 font-mono text-sky-400 group-hover:text-sky-300 transition-colors">{of.numero_of}</td>
-                  <td className="px-6 py-4 font-medium text-slate-200 group-hover:text-white transition-colors">{of.nome_of}</td>
-                  <td className="px-6 py-4 text-slate-400">{new Date(of.criado_em).toLocaleDateString()}</td>
-                  <td className="px-6 py-4 w-64">
-                    <div className="flex items-center gap-3">
-                      <div className="w-full bg-slate-700 rounded-full h-1.5 flex-1 overflow-hidden">
-                        <div 
-                          className={cn("h-1.5 rounded-full transition-all duration-500", of.progress === 100 ? "bg-emerald-400" : "bg-sky-500")} 
-                          style={{ width: `${of.progress}%` }}
-                        ></div>
+              {ofs.map((of) => {
+                const prazo = formatPrazo(of.prazo_limite);
+                return (
+                  <tr 
+                    key={of.id} 
+                    onClick={() => useAppStore.getState().setSelectedOf(of.id)}
+                    className="hover:bg-slate-800/80 transition-colors cursor-pointer group"
+                  >
+                    <td className="px-6 py-4 font-mono text-sky-400 group-hover:text-sky-300 transition-colors">{of.numero_of}</td>
+                    <td className="px-6 py-4 font-medium text-slate-200 group-hover:text-white transition-colors">{of.nome_of}</td>
+                    <td className="px-6 py-4 text-slate-400">{new Date(of.criado_em).toLocaleDateString()}</td>
+                    <td className="px-6 py-4">
+                      {prazo ? (
+                        <div className={cn("flex items-center gap-1.5", prazo.color)}>
+                          <CalendarClock size={13} />
+                          <span className="text-xs">{prazo.label}</span>
+                          {prazo.badge && (
+                            <span className={cn(
+                              "text-[10px] px-1.5 py-0.5 rounded font-bold",
+                              prazo.badge === 'Expirado'
+                                ? 'bg-red-500/20 text-red-400'
+                                : 'bg-amber-500/20 text-amber-400'
+                            )}>{prazo.badge}</span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-slate-600 text-xs">—</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 w-64">
+                      <div className="flex items-center gap-3">
+                        <div className="w-full bg-slate-700 rounded-full h-1.5 flex-1 overflow-hidden">
+                          <div 
+                            className={cn("h-1.5 rounded-full transition-all duration-500", of.progress === 100 ? "bg-emerald-400" : "bg-sky-500")} 
+                            style={{ width: `${of.progress}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-xs font-medium text-slate-400 w-8">{of.progress}%</span>
                       </div>
-                      <span className="text-xs font-medium text-slate-400 w-8">{of.progress}%</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <button 
-                      className="text-sky-500 group-hover:text-sky-300 px-3 py-1 bg-sky-500/0 group-hover:bg-sky-500/20 rounded font-medium transition-all group-active:scale-95 duration-200"
-                    >
-                      Abrir
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <button 
+                        className="text-sky-500 group-hover:text-sky-300 px-3 py-1 bg-sky-500/0 group-hover:bg-sky-500/20 rounded font-medium transition-all group-active:scale-95 duration-200"
+                      >
+                        Abrir
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}
@@ -406,5 +489,3 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
     </div>
   );
 }
-
-

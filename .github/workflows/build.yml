@@ -1,6 +1,5 @@
 name: "Build App"
-
-on:
+on: 
   workflow_dispatch:
 
 jobs:
@@ -10,9 +9,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [macos-latest, windows-latest]
+        platform: [windows-latest]
     runs-on: ${{ matrix.platform }}
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -34,53 +32,20 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          APPLE_SIGNING_IDENTITY: ${{ matrix.platform == 'macos-latest' && '-' || '' }}
         with:
-          tagName: v__VERSION__
-          releaseName: 'Nexar v__VERSION__'
-          releaseBody: 'Uma nova versão do Nexar Work Manager (Windows e macOS).'
+          tagName: v1.0.${{ github.run_number }}
+          releaseName: 'Nexar HUB v1.0.${{ github.run_number }}'
+          releaseBody: 'Nova versão do Nexar HUB Work Manager (Windows).'
           releaseDraft: false
           prerelease: false
 
-      # Assinatura ad-hoc recursiva profunda (macOS)
-      # O tauri-action assina apenas o binário principal.
-      # Este passo assina TODOS os frameworks e libraries embebidos,
-      # que é o que o Gatekeeper verifica antes de permitir a execução.
-      - name: Deep ad-hoc sign macOS app
-        if: matrix.platform == 'macos-latest'
-        run: |
-          APP=$(find src-tauri/target/release/bundle/macos -name "*.app" | head -1)
-          echo "A assinar recursivamente: $APP"
-          # Remove assinaturas anteriores e faz deep sign
-          find "$APP" -type f \( -name "*.dylib" -o -name "*.so" -o -perm +0111 \) | while read f; do
-            codesign --force --sign - "$f" 2>/dev/null || true
-          done
-          # Assina o bundle completo em modo deep
-          codesign --force --deep --sign - "$APP"
-          echo "Assinatura concluída."
-          codesign --verify --deep --strict "$APP" && echo "✅ Verificação OK" || echo "⚠️ Verificação falhou"
-
-      # Reempacota o DMG com a app já assinada corretamente
-      - name: Repackage DMG with signed app
-        if: matrix.platform == 'macos-latest'
-        run: |
-          APP=$(find src-tauri/target/release/bundle/macos -name "*.app" | head -1)
-          DMG=$(find src-tauri/target/release/bundle/dmg -name "*.dmg" | head -1)
-          TMP_DIR=$(mktemp -d)
-
-          echo "A reempacotar DMG com app assinada..."
-          mkdir -p "$TMP_DIR/staging"
-          cp -R "$APP" "$TMP_DIR/staging/"
-          hdiutil create -volname "Nexar HUB" -srcfolder "$TMP_DIR/staging" -ov -format UDZO "$DMG"
-
-          rm -rf "$TMP_DIR"
-          echo "✅ DMG reempacotado"
-
-      - name: Upload signed DMG to release
-        if: matrix.platform == 'macos-latest'
+      # Upload de artefactos Windows
+      - name: Upload Windows Artifacts to Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ github.run_number }}
-          files: src-tauri/target/release/bundle/dmg/*.dmg
+          tag_name: v1.0.${{ github.run_number }}
+          files: |
+            src-tauri/target/release/bundle/msi/*.msi
+            src-tauri/target/release/bundle/nsis/*.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

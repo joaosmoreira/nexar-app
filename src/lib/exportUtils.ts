@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx';
 import { save } from '@tauri-apps/plugin-dialog';
 import { writeFile, writeTextFile } from '@tauri-apps/plugin-fs';
+import { toast } from 'sonner';
 
 const isTauri = () => '__TAURI_INTERNALS__' in window;
 
@@ -44,11 +45,13 @@ export const exportProjectExcelWithTasks = async (projetoNome: string, cliente: 
        if (filePath) {
           const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
           await writeFile(filePath, new Uint8Array(excelBuffer));
+          toast.success("Progresso exportado com sucesso!");
        }
-     } catch (e: any) { alert("Erro ao guardar documento: " + (e?.message || String(e))); }
+     } catch (e: any) { toast.error("Erro ao guardar documento: " + (e?.message || String(e))); }
   } else {
      // Fallback para quando o João testa no Google Chrome / Safari normal ("npm run dev" fora da App)
      XLSX.writeFile(workbook, `${filename}.xlsx`);
+     toast.success("Progresso exportado com sucesso!");
   }
 };
 
@@ -66,10 +69,12 @@ export const exportToExcel = async (data: any[], filename: string) => {
        if (filePath) {
           const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
           await writeFile(filePath, new Uint8Array(excelBuffer));
+          toast.success("Folha excel criada com sucesso!");
        }
-     } catch (e: any) { alert("Erro ao guardar excell: " + (e?.message || String(e))); }
+     } catch (e: any) { toast.error("Erro ao guardar excell: " + (e?.message || String(e))); }
   } else {
      XLSX.writeFile(workbook, `${filename}.xlsx`);
+     toast.success("Folha excel exportada na web!");
   }
 };
 
@@ -82,8 +87,9 @@ export const exportToJson = async (data: any[], filename: string) => {
        });
        if (filePath) {
           await writeTextFile(filePath, JSON.stringify(data, null, 2));
+          toast.success("Backup JSON guardado em disco!");
        }
-     } catch (e: any) { alert("Erro ao guardar json: " + (e?.message || String(e))); }
+     } catch (e: any) { toast.error("Erro ao guardar json: " + (e?.message || String(e))); }
   } else {
      // Browser nativo
      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data, null, 2));
@@ -93,5 +99,6 @@ export const exportToJson = async (data: any[], filename: string) => {
      document.body.appendChild(downloadAnchorNode);
      downloadAnchorNode.click();
      downloadAnchorNode.remove();
+     toast.success("Backup JSON extraído (Web)");
   }
 };

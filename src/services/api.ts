@@ -24,6 +24,7 @@ export interface OrdemFabrico {
   numero_of: string;
   status: string;
   criado_em: string;
+  prazo_limite?: string | null;
   tarefas?: { concluido: boolean }[];
   notas?: string;
 }
@@ -148,6 +149,179 @@ export async function fetchDashboardMetrics(isArchiveMode: boolean) {
   }
 }
 
+/**
+ * Devolve as OFs abertas há mais tempo (progress < 100), ordenadas por criado_em ASC.
+ * Usado no GlobalDashboard para a secção de alertas.
+ */
+export async function fetchAlertOFs(limit = 6): Promise<any[]> {
+  const isOpenOf = (of: any) => {
+    const total = of.tarefas?.length || 0;
+    if (total === 0) return true;
+    return of.tarefas.filter((t: any) => t.concluido).length < total;
+  };
+
+  if (isOnline()) {
+    const { data, error } = await supabase
+      .from('ordens_fabrico')
+      .select('id, numero_of, nome_of, criado_em, prazo_limite, projeto_id, tarefas(concluido), projectos(nome)')
+      .order('criado_em', { ascending: true })
+      .limit(60); // pool alargado para garantir 6 candidatos após filtragem
+
+    if (error) throw error;
+
+    const open: any[] = (data || []).filter(isOpenOf);
+
+    const now = Date.now();
+    const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+
+    // Urgentes: têm prazo definido e faltam ≤ 7 dias (e ainda não expirou)
+    const urgent = open.filter((of: any) => {
+      if (!of.prazo_limite) return false;
+      const diff = new Date(of.prazo_limite).getTime() - now;
+      return diff >= 0 && diff <= sevenDaysMs;
+    }).sort((a: any, b: any) =>
+      new Date(a.prazo_limite).getTime() - new Date(b.prazo_limite).getTime()
+    );
+
+    const urgentIds = new Set(urgent.map((of: any) => of.id));
+
+    // Restantes: abertas há mais tempo (já ordenadas por criado_em ASC)
+    const oldest = open.filter((of: any) => !urgentIds.has(of.id));
+
+    return [...urgent, ...oldest].slice(0, limit);
+  } else {
+    // Offline: usa o cache
+    const cache = await readCache();
+    const ofsByProjeto = cache.ofsByProjeto || {};
+    const projetos: Projeto[] = [...(cache.projetos || []), ...(cache.projetoArquivados || [])];
+    const projetoMap = new Map(projetos.map((p) => [p.id, p.nome]));
+
+    const now = Date.now();
+    const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+
+    const allOfs: any[] = (Object.values(ofsByProjeto) as any[][])
+      .flat()
+      .filter((of: any) => {
+        const total = of.tarefas?.length || 0;
+        if (total === 0) return true;
+        return of.tarefas.filter((t: any) => t.concluido).length < total;
+      })
+      .map((of: any) => ({ ...of, projectos: { nome: projetoMap.get(of.projeto_id) || '' } }));
+
+    const urgent = allOfs
+      .filter((of: any) => {
+        if (!of.prazo_limite) return false;
+        const diff = new Date(of.prazo_limite).getTime() - now;
+        return diff >= 0 && diff <= sevenDaysMs;
+      })
+      .sort((a: any, b: any) => new Date(a.prazo_limite).getTime() - new Date(b.prazo_limite).getTime());
+
+    const urgentIds = new Set(urgent.map((of: any) => of.id));
+
+    const oldest = allOfs
+      .filter((of: any) => !urgentIds.has(of.id))
+      .sort((a: any, b: any) => new Date(a.criado_em).getTime() - new Date(b.criado_em).getTime());
+
+    return [...urgent, ...oldest].slice(0, limit);
+  }
+}
+
+
+/**
+ * Fetch rápido das OFs com prazo_limite nos próximos 7 dias (ainda abertas).
+ * Cacheado externamente — chamado apenas uma vez por sessão/dia.
+ */
+export async function fetchOfsWithDeadlineSoon(): Promise<{ projeto_id: number; prazo_limite: string }[]> {
+  if (!isOnline()) return [];
+  const now = new Date();
+  const in7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await supabase
+    .from('ordens_fabrico')
+    .select('id, projeto_id, prazo_limite, tarefas(concluido)')
+    .not('prazo_limite', 'is', null)
+    .lte('prazo_limite', in7Days)
+    .gte('prazo_limite', now.toISOString());
+
+  if (error) return [];
+
+  // Filtra apenas as que ainda não estão concluídas
+  return (data || [])
+    .filter((of: any) => {
+      const total = of.tarefas?.length || 0;
+      if (total === 0) return true;
+      return of.tarefas.filter((t: any) => t.concluido).length < total;
+    })
+    .map((of: any) => ({ projeto_id: of.projeto_id, prazo_limite: of.prazo_limite }));
+}
+
+/**
+ * Devolve os IDs de projetos onde TODAS as OFs têm TODAS as tarefas concluídas.
+ * Cacheado externamente — chamado apenas uma vez por sessão/dia.
+ */
+export async function fetchProjectsCompletionStatus(): Promise<number[]> {
+  if (!isOnline()) return [];
+  const { data, error } = await supabase
+    .from('ordens_fabrico')
+    .select('projeto_id, tarefas(concluido)');
+
+  if (error || !data) return [];
+
+  // Agrupa por projeto_id e verifica se todas as OFs estão totalmente concluídas
+  const byProject = new Map<number, boolean>();
+  for (const of_ of data as any[]) {
+    const projId = of_.projeto_id;
+    const total = of_.tarefas?.length || 0;
+    const allDone = total > 0 && (of_.tarefas as any[]).every((t: any) => t.concluido);
+    const prev = byProject.get(projId);
+    if (prev === undefined) {
+      byProject.set(projId, allDone);
+    } else {
+      // Se qualquer OF não estiver concluída, o projeto não está concluído
+      if (!allDone) byProject.set(projId, false);
+    }
+  }
+
+  return [...byProject.entries()]
+    .filter(([, done]) => done)
+    .map(([id]) => id);
+}
+
+
+/**
+ * Devolve o próximo número sequencial para OFs do projeto GS0000.
+ * Formato: 00000001, 00000002, ...
+ */
+export async function fetchNextGs0000OfNumber(projetoId: number): Promise<string> {
+  if (isOnline()) {
+    const { data } = await supabase
+      .from('ordens_fabrico')
+      .select('numero_of')
+      .eq('projeto_id', projetoId)
+      .order('numero_of', { ascending: false });
+
+    if (!data || data.length === 0) return '00000001';
+
+    // Filtra os que são puramente numéricos (sequência GS0000)
+    const nums = data
+      .map((of: any) => parseInt(of.numero_of, 10))
+      .filter((n: number) => !isNaN(n));
+
+    if (nums.length === 0) return '00000001';
+
+    const maxNum = Math.max(...nums);
+    return String(maxNum + 1).padStart(8, '0');
+  } else {
+    const cache = await readCache();
+    const ofs: OrdemFabrico[] = (cache.ofsByProjeto || {})[projetoId] || [];
+    const nums = ofs
+      .map((of) => parseInt(of.numero_of, 10))
+      .filter((n) => !isNaN(n));
+    if (nums.length === 0) return '00000001';
+    const maxNum = Math.max(...nums);
+    return String(maxNum + 1).padStart(8, '0');
+  }
+}
+
 export async function globalSearch(term: string) {
   if (!term || term.trim().length < 2) return { projetos: [], ofs: [] };
 
@@ -249,9 +423,14 @@ export async function updateProjetoNotas(projetoId: number, notas: string) {
   }
 }
 
-export async function createOF(projetoId: number, nomeOf: string, numeroOf: string): Promise<OrdemFabrico> {
+export async function createOF(
+  projetoId: number,
+  nomeOf: string,
+  numeroOf: string,
+  prazoLimite?: string | null
+): Promise<OrdemFabrico> {
   if (isOnline()) {
-    return createOFRemote(projetoId, nomeOf, numeroOf);
+    return createOFRemote(projetoId, nomeOf, numeroOf, prazoLimite);
   } else {
     const tempId = nextTempId();
     const now = new Date().toISOString();
@@ -270,6 +449,7 @@ export async function createOF(projetoId: number, nomeOf: string, numeroOf: stri
       numero_of: numeroOf,
       status: 'em_progresso',
       criado_em: now,
+      prazo_limite: prazoLimite || null,
       tarefas: predefinedTasks.map(t => ({ concluido: t.concluido })),
     };
 
@@ -278,7 +458,7 @@ export async function createOF(projetoId: number, nomeOf: string, numeroOf: stri
     ofsByProjeto[projetoId] = [newOf, ...(ofsByProjeto[projetoId] || [])];
     const tarefasByOf = { ...(cache.tarefasByOf || {}), [tempId]: predefinedTasks };
     await patchCache({ ofsByProjeto, tarefasByOf });
-    await queueMutation({ action: 'createOF', tempId, projetoId, nomeOf, numeroOf });
+    await queueMutation({ action: 'createOF', tempId, projetoId, nomeOf, numeroOf, prazoLimite });
     return newOf;
   }
 }
@@ -353,7 +533,7 @@ export async function createTarefa(ordemId: number, nomeTarefa: string, index: n
   }
 }
 
-export async function updateOrdemFabrico(ofId: number, fields: { nome_of?: string; numero_of?: string; notas?: string }) {
+export async function updateOrdemFabrico(ofId: number, fields: { nome_of?: string; numero_of?: string; notas?: string; prazo_limite?: string | null }) {
   if (isOnline()) {
     await updateOrdemFabricoRemote(ofId, fields);
   } else {
@@ -441,10 +621,18 @@ export async function updateProjetoNotasRemote(projetoId: number, notas: string)
   if (error) throw error;
 }
 
-export async function createOFRemote(projetoId: number, nomeOf: string, numeroOf: string): Promise<OrdemFabrico> {
+export async function createOFRemote(
+  projetoId: number,
+  nomeOf: string,
+  numeroOf: string,
+  prazoLimite?: string | null
+): Promise<OrdemFabrico> {
+  const insertPayload: any = { projeto_id: projetoId, nome_of: nomeOf, numero_of: numeroOf };
+  if (prazoLimite) insertPayload.prazo_limite = prazoLimite;
+
   const { data: newOfData, error: insertError } = await supabase
     .from('ordens_fabrico')
-    .insert([{ projeto_id: projetoId, nome_of: nomeOf, numero_of: numeroOf }])
+    .insert([insertPayload])
     .select()
     .single();
 
@@ -499,16 +687,12 @@ export async function createProjetoRemote(nome: string, cliente: string): Promis
 }
 
 export async function arquivarProjetoRemote(id: number) {
+  // Apenas arquiva o projeto — OFs e tarefas são preservadas para consulta futura
   const { error: projError } = await supabase
     .from('projectos')
     .update({ arquivado: true })
     .eq('id', id);
   if (projError) throw projError;
-  const { data: ofs } = await supabase.from('ordens_fabrico').select('id').eq('projeto_id', id);
-  if (ofs && ofs.length > 0) {
-    const ofIds = ofs.map((o: any) => o.id);
-    await supabase.from('tarefas').delete().in('ordem_id', ofIds);
-  }
 }
 
 export async function deleteProjetoRemote(id: number) {
@@ -531,7 +715,7 @@ export async function createTarefaRemote(ordemId: number, nomeTarefa: string, in
   return data as Tarefa;
 }
 
-export async function updateOrdemFabricoRemote(ofId: number, fields: { nome_of?: string; numero_of?: string; notas?: string }) {
+export async function updateOrdemFabricoRemote(ofId: number, fields: { nome_of?: string; numero_of?: string; notas?: string; prazo_limite?: string | null }) {
   const { error } = await supabase.from('ordens_fabrico').update(fields).eq('id', ofId);
   if (error) throw error;
 }
