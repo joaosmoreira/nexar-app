@@ -10,6 +10,7 @@ import {
 
 export interface Projeto {
   id: number;
+  user_id: string;
   nome: string;
   cliente: string;
   criado_em: string;
@@ -467,9 +468,17 @@ export async function createProjeto(nome: string, cliente: string): Promise<Proj
   if (isOnline()) {
     return createProjetoRemote(nome, cliente);
   } else {
+    const { data: { user } } = await supabase.auth.getUser();
     const tempId = nextTempId();
     const now = new Date().toISOString();
-    const newProjeto: Projeto = { id: tempId, nome, cliente, criado_em: now, arquivado: false };
+    const newProjeto: Projeto = { 
+      id: tempId, 
+      user_id: user?.id || 'offline-user',
+      nome, 
+      cliente, 
+      criado_em: now, 
+      arquivado: false 
+    };
 
     const cache = await readCache();
     const projetos = [newProjeto, ...(cache.projetos || [])];
@@ -784,3 +793,48 @@ export async function getPendingCount(): Promise<number> {
   const q = await readPending();
   return q.length;
 }
+
+// ─────────────────────────────────────────────────────────────────
+//  RBAC — Gestão de Roles (Admin Only)
+// ─────────────────────────────────────────────────────────────────
+
+export type UserRole = 'admin' | 'user';
+
+export interface UserWithRole {
+  user_id: string;
+  email: string;
+  role: UserRole;
+}
+
+/** Devolve o role do utilizador autenticado. Retorna 'user' se não existir entrada. */
+export async function fetchUserRole(): Promise<UserRole> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return 'user';
+  const { data, error } = await supabase
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', user.id)
+    .single();
+  if (error || !data) return 'user';
+  return data.role as UserRole;
+}
+
+/** Lista todos os utilizadores e os seus roles (apenas admin tem acesso via RLS). */
+export async function fetchAllUsers(): Promise<UserWithRole[]> {
+  const { data, error } = await supabase
+    .from('user_roles')
+    .select('user_id, email, role')
+    .order('email', { ascending: true });
+  if (error) throw error;
+  return (data || []) as UserWithRole[];
+}
+
+/** Atualiza o role de um utilizador (apenas admin tem acesso via RLS). */
+export async function updateUserRole(userId: string, role: UserRole): Promise<void> {
+  const { error } = await supabase
+    .from('user_roles')
+    .update({ role })
+    .eq('user_id', userId);
+  if (error) throw error;
+}
+

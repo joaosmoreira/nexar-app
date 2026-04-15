@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../store/useAppStore';
-import { fetchProjetos, fetchOfsByProjeto, createProjeto, fetchProjetosArquivados, fetchOfsWithDeadlineSoon, fetchProjectsCompletionStatus, Projeto, OrdemFabrico } from '../services/api';
-import { Folder, FileCog, Layers, Plus, Archive, AlertTriangle, CheckCircle2, Search, LogOut, User, Wifi, WifiOff, RefreshCw } from 'lucide-react';
+import { fetchProjetos, fetchOfsByProjeto, createProjeto, fetchProjetosArquivados, fetchOfsWithDeadlineSoon, fetchProjectsCompletionStatus, fetchAllUsers, Projeto, OrdemFabrico, UserWithRole } from '../services/api';
+import { Folder, FileCog, Layers, Plus, Archive, AlertTriangle, CheckCircle2, Search, LogOut, User, Users, Wifi, WifiOff, RefreshCw, ChevronRight, KeyRound } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { cn } from '../lib/utils';
 import { Modal } from './Modal';
@@ -192,12 +192,106 @@ function OfItem({ ofData }: { ofData: OrdemFabrico }) {
   );
 }
 
+// ─── AdminUserGroup — Nível de utilizador na vista admin ──────────────────────
+
+function AdminUserGroup({ userInfo, projetos, deadlineProjectIds, completedProjectIds }: {
+  userInfo: UserWithRole;
+  projetos: Projeto[];
+  deadlineProjectIds: number[];
+  completedProjectIds: number[];
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const currentUserId = useAppStore.getState().user?.id;
+  const isCurrentUser = userInfo.user_id === currentUserId;
+  const emailLabel = userInfo.email.split('@')[0];
+
+  return (
+    <div className="mb-1">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className={cn(
+          "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all group",
+          expanded ? "bg-violet-500/10 text-violet-300" : "hover:bg-slate-800/50 text-slate-400"
+        )}
+      >
+        <ChevronRight
+          size={14}
+          className={cn(
+            "shrink-0 transition-transform duration-200",
+            expanded && "rotate-90"
+          )}
+        />
+        <div className={cn(
+          "w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold shrink-0",
+          isCurrentUser
+            ? "bg-violet-500/15 text-violet-300 border border-violet-500/25"
+            : "bg-sky-500/10 text-sky-400 border border-sky-500/20"
+        )}>
+          {emailLabel[0].toUpperCase()}
+        </div>
+        <div className="flex-1 text-left truncate">
+          <div className="text-[12px] font-medium truncate">{emailLabel}</div>
+          <div className="text-[10px] opacity-50 truncate">{projetos.length} obra{projetos.length !== 1 ? 's' : ''}</div>
+        </div>
+        {isCurrentUser && (
+          <span className="text-[9px] text-violet-400/60 bg-violet-500/10 px-1.5 py-0.5 rounded font-medium shrink-0">Tu</span>
+        )}
+      </button>
+
+      {expanded && (
+        <div className="ml-3 mt-1 pl-3 border-l border-slate-800 space-y-0.5">
+          {projetos.length === 0 ? (
+            <div className="text-[11px] text-slate-600 px-3 py-2">Sem obras</div>
+          ) : (
+            projetos.map(p => (
+              <ProjectItem key={p.id} projeto={p} deadlineProjectIds={deadlineProjectIds} completedProjectIds={completedProjectIds} />
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function Sidebar() {
-  const { isArchiveMode, setArchiveMode, user, isOnline, isSyncing, lastSyncAt, hasPendingMutations, dataVersion } = useAppStore();
+  const { isArchiveMode, setArchiveMode, user, userRole, isOnline, isSyncing, lastSyncAt, hasPendingMutations, dataVersion, setUserMgmtOpen, isUserMgmtOpen } = useAppStore();
   const [projetos, setProjetos] = useState<Projeto[]>([]);
   const [loading, setLoading] = useState(true);
   const [deadlineProjectIds, setDeadlineProjectIds] = useState<number[]>([]);
   const [completedProjectIds, setCompletedProjectIds] = useState<number[]>([]);
+  const [allUsers, setAllUsers] = useState<UserWithRole[]>([]);
+  const isAdmin = userRole === 'admin';
+
+  // Password change state
+  const [pwModalOpen, setPwModalOpen] = useState(false);
+  const [newPw, setNewPw] = useState('');
+  const [confirmPw, setConfirmPw] = useState('');
+  const [pwLoading, setPwLoading] = useState(false);
+  const [pwError, setPwError] = useState('');
+  const [pwSuccess, setPwSuccess] = useState('');
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPwError('');
+    setPwSuccess('');
+    if (newPw !== confirmPw) {
+      setPwError('As palavras-passe não coincidem.');
+      return;
+    }
+    setPwLoading(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPw });
+      if (error) throw error;
+      setPwSuccess('Palavra-passe alterada com sucesso!');
+      setNewPw('');
+      setConfirmPw('');
+      setTimeout(() => { setPwModalOpen(false); setPwSuccess(''); }, 1500);
+    } catch (err: any) {
+      setPwError(err.message || 'Erro ao alterar palavra-passe.');
+    } finally {
+      setPwLoading(false);
+    }
+  };
 
   const loadProjetos = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -221,6 +315,13 @@ export function Sidebar() {
       })
       .catch(() => {}); // silencioso — não é crítico
   }, []);
+
+  // Carregar lista de utilizadores para vista de admin
+  useEffect(() => {
+    if (isAdmin) {
+      fetchAllUsers().then(setAllUsers).catch(() => setAllUsers([]));
+    }
+  }, [isAdmin]);
 
   const firstLoad = useRef(true);
   const previousArchiveMode = useRef(isArchiveMode);
@@ -309,9 +410,36 @@ export function Sidebar() {
     }
   };
 
+  // Admin em modo normal: mostrar apenas os seus projetos (como um user normal)
+  const myProjetos = isAdmin && !isUserMgmtOpen
+    ? projetos.filter(p => p.user_id === user?.id)
+    : projetos;
+
   // Separar GS0000 dos restantes projetos
-  const gs0000 = projetos.find(p => p.nome.startsWith('GS0000'));
-  const outrosProjetos = projetos.filter(p => !p.nome.startsWith('GS0000'));
+  const gs0000 = myProjetos.find(p => p.nome.startsWith('GS0000'));
+  const outrosProjetos = myProjetos.filter(p => !p.nome.startsWith('GS0000'));
+
+  // Agrupamento por utilizador (vista admin)
+  const userGroupMap = new Map<string, { userInfo: UserWithRole; projetos: Projeto[] }>();
+  if (isAdmin && allUsers.length > 0) {
+    // Inicializar mapa com todos os utilizadores
+    for (const u of allUsers) {
+      userGroupMap.set(u.user_id, { userInfo: u, projetos: [] });
+    }
+    // Distribuir projetos pelos utilizadores
+    for (const p of projetos) {
+      const group = userGroupMap.get(p.user_id);
+      if (group) {
+        group.projetos.push(p);
+      }
+    }
+  }
+  // Ordenar: utilizador atual primeiro, depois por email
+  const userGroups = [...userGroupMap.values()].sort((a, b) => {
+    if (a.userInfo.user_id === user?.id) return -1;
+    if (b.userInfo.user_id === user?.id) return 1;
+    return a.userInfo.email.localeCompare(b.userInfo.email);
+  });
 
   return (
     <aside 
@@ -363,7 +491,13 @@ export function Sidebar() {
 
       {/* HEADER da Sidebar - HUB */}
       <button 
-        onClick={() => { setArchiveMode(false); useAppStore.getState().setSelectedProject(null); }}
+        onClick={() => { 
+          setArchiveMode(false); 
+          useAppStore.getState().setSelectedProject(null); 
+          useAppStore.getState().setSelectedOf(null);
+          useAppStore.getState().setUserMgmtOpen(false);
+          useAppStore.getState().incrementDataVersion(); 
+        }}
         className="p-4 border-b border-slate-800 flex items-center gap-3 w-full text-left hover:bg-slate-800/30 active:scale-[0.98] transition-all duration-150 group cursor-pointer shrink-0"
         title="Voltar ao HUB Global"
       >
@@ -425,7 +559,21 @@ export function Sidebar() {
           <div className="text-sm text-slate-500 px-3 text-center py-4 border border-dashed border-slate-800 rounded-lg">
             Nenhum projeto encontrado.
           </div>
+        ) : isAdmin && isUserMgmtOpen && userGroups.length > 0 ? (
+          /* ── Vista Admin: agrupada por utilizador ──────────── */
+          <div className="space-y-1">
+            {userGroups.map(({ userInfo, projetos: userProjetos }) => (
+              <AdminUserGroup
+                key={userInfo.user_id}
+                userInfo={userInfo}
+                projetos={userProjetos}
+                deadlineProjectIds={deadlineProjectIds}
+                completedProjectIds={completedProjectIds}
+              />
+            ))}
+          </div>
         ) : (
+          /* ── Vista Normal: flat ───────────────────────────── */
           <>
             {/* GS0000 — sempre fixo no topo */}
             {gs0000 && (
@@ -475,6 +623,27 @@ export function Sidebar() {
             }
           </span>
         </div>
+
+        {/* Botão Gestão de Equipa — apenas Admins */}
+        {userRole === 'admin' && (
+          <button
+            onClick={() => {
+              setUserMgmtOpen(!isUserMgmtOpen);
+              useAppStore.getState().setSelectedProject(null);
+              useAppStore.getState().setSelectedOf(null);
+              useAppStore.getState().setArchiveMode(false);
+            }}
+            className={cn(
+              "w-full flex items-center justify-center gap-2 p-3 rounded-lg active:scale-[0.98] transition-all duration-150 border text-sm font-medium",
+              isUserMgmtOpen
+                ? "bg-violet-500/20 text-violet-300 border-violet-500/30"
+                : "text-slate-400 border-slate-700 hover:bg-slate-800 hover:text-slate-200"
+            )}
+          >
+            <Users size={16} />
+            Gestão de Equipa
+          </button>
+        )}
         <button 
           onClick={() => setArchiveMode(!isArchiveMode)}
           className={cn(
@@ -498,15 +667,72 @@ export function Sidebar() {
                  <div className="truncate text-[10px] text-slate-500">{user?.email}</div>
               </div>
            </div>
-           <button 
-             onClick={() => supabase.auth.signOut()}
-             className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 active:scale-90 rounded transition-all"
-             title="Terminar Sessão"
-           >
-             <LogOut size={16} />
-           </button>
+           <div className="flex items-center gap-0.5 shrink-0">
+              <button 
+                onClick={() => setPwModalOpen(true)}
+                className="p-2 text-slate-500 hover:text-amber-400 hover:bg-amber-500/10 active:scale-90 rounded transition-all"
+                title="Alterar Palavra-passe"
+              >
+                <KeyRound size={16} />
+              </button>
+              <button 
+                onClick={() => supabase.auth.signOut()}
+                className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 active:scale-90 rounded transition-all"
+                title="Terminar Sessão"
+              >
+                <LogOut size={16} />
+              </button>
+           </div>
         </div>
       </div>
+
+      {/* Modal Alterar Password */}
+      <Modal isOpen={pwModalOpen} title="Alterar Palavra-passe" onClose={() => { setPwModalOpen(false); setPwError(''); setPwSuccess(''); }}>
+        <form onSubmit={handleChangePassword} className="flex flex-col gap-4">
+          {pwError && (
+            <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-lg p-3">
+              {pwError}
+            </div>
+          )}
+          {pwSuccess && (
+            <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm rounded-lg p-3">
+              {pwSuccess}
+            </div>
+          )}
+          <div>
+            <label className="block text-sm font-medium text-slate-400 mb-1">Nova palavra-passe</label>
+            <input
+              autoFocus
+              type="password"
+              required
+              minLength={6}
+              value={newPw}
+              onChange={e => setNewPw(e.target.value)}
+              placeholder="Mínimo 6 caracteres"
+              className="w-full bg-slate-950 border border-slate-800 text-slate-200 rounded-lg p-2.5 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none transition-all"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-400 mb-1">Confirmar nova palavra-passe</label>
+            <input
+              type="password"
+              required
+              minLength={6}
+              value={confirmPw}
+              onChange={e => setConfirmPw(e.target.value)}
+              placeholder="Repete a palavra-passe"
+              className="w-full bg-slate-950 border border-slate-800 text-slate-200 rounded-lg p-2.5 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none transition-all"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={pwLoading}
+            className="mt-2 w-full bg-sky-500 hover:bg-sky-400 active:scale-95 text-white font-medium rounded-lg p-3 transition-all disabled:opacity-50"
+          >
+            {pwLoading ? 'A alterar...' : 'Alterar Palavra-passe'}
+          </button>
+        </form>
+      </Modal>
 
     </aside>
   );
