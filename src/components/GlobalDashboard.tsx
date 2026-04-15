@@ -17,11 +17,12 @@ function AgeDot({ days }: { days: number }) {
 }
 
 export function GlobalDashboard() {
-  const { isArchiveMode, setSelectedProject, dataVersion } = useAppStore();
+  const { isArchiveMode, setSelectedProject, dataVersion, user, userRole, isUserMgmtOpen } = useAppStore();
   const [metrics, setMetrics] = useState<any[]>([]);
   const [oldestOfs, setOldestOfs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const isAdmin = userRole === 'admin';
 
   const loadMetrics = async () => {
     setLoading(true);
@@ -30,8 +31,15 @@ export function GlobalDashboard() {
         fetchDashboardMetrics(isArchiveMode),
         isArchiveMode ? Promise.resolve([]) : fetchAlertOFs(6),
       ]);
-      setMetrics(data);
-      setOldestOfs(oldest);
+
+      // Admin em modo normal: apenas os seus projetos
+      if (isAdmin && !isUserMgmtOpen && user) {
+        setMetrics(data.filter((p: any) => p.user_id === user.id));
+        setOldestOfs(oldest.filter((o: any) => o.user_id === user.id));
+      } else {
+        setMetrics(data);
+        setOldestOfs(oldest);
+      }
     } catch (e: any) {
       console.error(e);
     }
@@ -40,7 +48,7 @@ export function GlobalDashboard() {
 
   useEffect(() => {
     loadMetrics();
-  }, [isArchiveMode, dataVersion]);
+  }, [isArchiveMode, dataVersion, isUserMgmtOpen, userRole]);
 
   if (loading) {
      return <div className="p-8 text-slate-400 font-medium animate-pulse">A carregar métricas globais...</div>;

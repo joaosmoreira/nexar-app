@@ -1,24 +1,26 @@
--- ══════════════════════════════════════════════════════════════════════
---  NEXAR HUB — Schema Supabase Completo (Modo NÃO-DESTRUTIVO)
---  Versão: 2.1 (com Auth Multi-Utilizador, RLS + Informações Gerais)
---  Executar no painel: Supabase Dashboard > SQL Editor
--- ══════════════════════════════════════════════════════════════════════
+-- =====================================================================
+--  NEXAR HUB - Schema Supabase (Modo SEGURO / NAO-DESTRUTIVO)
+--  Versao: 3.1 (RBAC - Role Based Access Control)
+--  Seguro para executar em bases de dados com dados existentes
+--  Sem DROP TABLE, DELETE ou TRUNCATE
+--  Usa IF NOT EXISTS em todo o lado
+-- =====================================================================
 
--- ─────────────────────────────────────────────────────────────────────
---  PASSO 1 — Criar tabelas caso não existam (Seguro: Não apaga dados)
--- ─────────────────────────────────────────────────────────────────────
+
+-- ---------------------------------------------------------------------
+--  PASSO 1 - Tabelas Base
+-- ---------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS public.projectos (
-  id              bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  user_id         uuid REFERENCES auth.users(id) DEFAULT auth.uid() NOT NULL,
-  nome            text NOT NULL,
-  cliente         text,
-  arquivado       boolean DEFAULT false,
+  id               bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id          uuid REFERENCES auth.users(id) DEFAULT auth.uid() NOT NULL,
+  nome             text NOT NULL,
+  cliente          text,
+  arquivado        boolean DEFAULT false,
   ultimo_movimento timestamp with time zone DEFAULT now(),
-  criado_em       timestamp with time zone DEFAULT now()
+  criado_em        timestamp with time zone DEFAULT now()
 );
 
--- Assegura que a coluna "informacoes_gerais" existe sempre na tabela
 ALTER TABLE public.projectos ADD COLUMN IF NOT EXISTS informacoes_gerais text;
 
 CREATE TABLE IF NOT EXISTS public.ordens_fabrico (
@@ -31,10 +33,7 @@ CREATE TABLE IF NOT EXISTS public.ordens_fabrico (
   criado_em   timestamp with time zone DEFAULT now()
 );
 
--- Assegura que a coluna "notas" existe sempre na tabela de O.F.s
 ALTER TABLE public.ordens_fabrico ADD COLUMN IF NOT EXISTS notas text;
-
--- Assegura que a coluna "prazo_limite" existe sempre na tabela de O.F.s
 ALTER TABLE public.ordens_fabrico ADD COLUMN IF NOT EXISTS prazo_limite timestamp with time zone;
 
 CREATE TABLE IF NOT EXISTS public.tarefas (
@@ -46,61 +45,141 @@ CREATE TABLE IF NOT EXISTS public.tarefas (
   ordem_index int8 NOT NULL
 );
 
--- ─────────────────────────────────────────────────────────────────────
---  PASSO 2 — Ativar Row Level Security (RLS) em todas as tabelas
--- ─────────────────────────────────────────────────────────────────────
-ALTER TABLE public.projectos        ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.ordens_fabrico   ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.tarefas          ENABLE ROW LEVEL SECURITY;
 
--- ─────────────────────────────────────────────────────────────────────
---  PASSO 3 — Políticas de acesso (um utilizador só gere os seus dados)
--- 
---  (Usa o bloco genérico DO para evitar erros se a política já existir)
--- ─────────────────────────────────────────────────────────────────────
-DO $$ 
+-- ---------------------------------------------------------------------
+--  PASSO 2 - Tabela de Roles (RBAC)
+-- ---------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS public.user_roles (
+  user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
+  role    text NOT NULL CHECK (role IN ('admin', 'user')) DEFAULT 'user',
+  email   text NOT NULL
+);
+
+
+-- ---------------------------------------------------------------------
+--  PASSO 3 - Funcoes Auxiliares
+-- ---------------------------------------------------------------------
+
+-- Verifica se o utilizador autenticado e admin
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS boolean AS $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Utilizador só pode gerir os seus Projetos' AND tablename = 'projectos') THEN
-    CREATE POLICY "Utilizador só pode gerir os seus Projetos" ON public.projectos FOR ALL USING (auth.uid() = user_id);
-  END IF;
+  RETURN EXISTS (
+    SELECT 1 FROM public.user_roles
+    WHERE user_id = auth.uid()
+    AND role = 'admin'
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Utilizador só pode gerir as suas Ordens' AND tablename = 'ordens_fabrico') THEN
-    CREATE POLICY "Utilizador só pode gerir as suas Ordens" ON public.ordens_fabrico FOR ALL USING (auth.uid() = user_id);
-  END IF;
+-- Cria automaticamente um registo em user_roles apos novo registo
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger AS $$
+BEGIN
+  INSERT INTO public.user_roles (user_id, email, role)
+  VALUES (new.id, new.email, 'user')
+  ON CONFLICT (user_id) DO NOTHING;
+  RETURN new;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Utilizador só pode gerir as suas Tarefas' AND tablename = 'tarefas') THEN
-    CREATE POLICY "Utilizador só pode gerir as suas Tarefas" ON public.tarefas FOR ALL USING (auth.uid() = user_id);
+
+-- ---------------------------------------------------------------------
+--  PASSO 4 - Trigger para novos utilizadores (apenas se nao existir)
+-- ---------------------------------------------------------------------
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_trigger WHERE tgname = 'on_auth_user_created'
+  ) THEN
+    CREATE TRIGGER on_auth_user_created
+      AFTER INSERT ON auth.users
+      FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
   END IF;
 END $$;
 
--- ══════════════════════════════════════════════════════════════════════
---  ESTRUTURA FINAL DAS TABELAS (Referência Rápida Atualizada v2.1)
--- ══════════════════════════════════════════════════════════════════════
+
+-- ---------------------------------------------------------------------
+--  PASSO 5 - Row Level Security (ativar RLS)
+-- ---------------------------------------------------------------------
+
+ALTER TABLE public.projectos      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ordens_fabrico ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tarefas        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_roles     ENABLE ROW LEVEL SECURITY;
+
+
+-- ---------------------------------------------------------------------
+--  PASSO 6 - Politicas RLS (criadas apenas se nao existirem)
+-- ---------------------------------------------------------------------
+
+DO $$
+BEGIN
+
+  -- Projectos: remove policy antiga (sem suporte admin) se existir
+  DROP POLICY IF EXISTS "Utilizador so pode gerir os seus Projetos" ON public.projectos;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE tablename = 'projectos'
+      AND policyname = 'Acesso Total Projectos (User ou Admin)'
+  ) THEN
+    CREATE POLICY "Acesso Total Projectos (User ou Admin)" ON public.projectos
+      FOR ALL USING (auth.uid() = user_id OR public.is_admin());
+  END IF;
+
+  -- Ordens de Fabrico
+  DROP POLICY IF EXISTS "Utilizador so pode gerir as suas Ordens" ON public.ordens_fabrico;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE tablename = 'ordens_fabrico'
+      AND policyname = 'Acesso Total Ordens (User ou Admin)'
+  ) THEN
+    CREATE POLICY "Acesso Total Ordens (User ou Admin)" ON public.ordens_fabrico
+      FOR ALL USING (auth.uid() = user_id OR public.is_admin());
+  END IF;
+
+  -- Tarefas
+  DROP POLICY IF EXISTS "Utilizador so pode gerir as suas Tarefas" ON public.tarefas;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE tablename = 'tarefas'
+      AND policyname = 'Acesso Total Tarefas (User ou Admin)'
+  ) THEN
+    CREATE POLICY "Acesso Total Tarefas (User ou Admin)" ON public.tarefas
+      FOR ALL USING (auth.uid() = user_id OR public.is_admin());
+  END IF;
+
+  -- User Roles: leitura (proprio ou admin)
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE tablename = 'user_roles' AND policyname = 'Leitura de Roles'
+  ) THEN
+    CREATE POLICY "Leitura de Roles" ON public.user_roles
+      FOR SELECT USING (auth.uid() = user_id OR public.is_admin());
+  END IF;
+
+  -- User Roles: escrita (apenas admin)
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE tablename = 'user_roles' AND policyname = 'Admin gere Roles'
+  ) THEN
+    CREATE POLICY "Admin gere Roles" ON public.user_roles
+      FOR UPDATE USING (public.is_admin());
+  END IF;
+
+END $$;
+
+
+-- =====================================================================
+--  APOS EXECUTAR - Promover o primeiro administrador manualmente:
 --
---  projectos
---  ├── id                 bigint PK
---  ├── user_id            uuid FK → auth.users (RLS)
---  ├── nome               text       ex: "GS1522 - Garsteel Escadas"
---  ├── cliente            text       ex: "Garsteel"
---  ├── arquivado          boolean    false = ativo, true = arquivado
---  ├── informacoes_gerais text       [NOVO] notas da obra
---  ├── ultimo_movimento   timestamp  atualizado em cada interação
---  └── criado_em          timestamp
+--  UPDATE public.user_roles
+--  SET role = 'admin'
+--  WHERE email = 'o-teu-email@empresa.com';
 --
---  ordens_fabrico
---  ├── id          bigint PK
---  ├── user_id     uuid FK → auth.users (RLS)
---  ├── projeto_id  bigint FK → projectos(id) ON DELETE CASCADE
---  ├── nome_of     text       ex: "Estrutura Principal"
---  ├── numero_of   text       ex: "OF-2024-001"
---  ├── status      text       'pendente' | 'em_progresso' | 'concluido'
---  └── criado_em   timestamp
---
---  tarefas
---  ├── id          bigint PK
---  ├── user_id     uuid FK → auth.users (RLS)
---  ├── ordem_id    bigint FK → ordens_fabrico(id) ON DELETE CASCADE
---  ├── nome_tarefa text       ex: "Modelação", "Fabrico", "Montagem"
---  ├── concluido   boolean
---  └── ordem_index int8       ordenação manual (0-5 pré-definidos)
--- ══════════════════════════════════════════════════════════════════════
+-- =====================================================================

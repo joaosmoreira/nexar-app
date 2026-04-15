@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { Session, User } from '@supabase/supabase-js';
+import { UserRole } from '../services/api';
 
 interface AppState {
   user: User | null;
@@ -8,6 +9,9 @@ interface AppState {
   selectedOfId: number | null;
   isArchiveMode: boolean;
   isSearchOpen: boolean;
+
+  // RBAC
+  userRole: UserRole;
 
   // Offline / sync state
   isOnline: boolean;
@@ -18,11 +22,20 @@ interface AppState {
   // Global Refresh Bus
   dataVersion: number;
 
+  // Admin Panel
+  isUserMgmtOpen: boolean;
+
+  // Password Recovery
+  isPasswordRecovery: boolean;
+
   setUser: (user: User | null, session: Session | null) => void;
   setSelectedProject: (id: number | null) => void;
   setSelectedOf: (id: number | null) => void;
   setArchiveMode: (active: boolean) => void;
   setSearchOpen: (open: boolean) => void;
+  setUserRole: (role: UserRole) => void;
+  setUserMgmtOpen: (open: boolean) => void;
+  setPasswordRecovery: (active: boolean) => void;
 
   setOnlineStatus: (online: boolean) => void;
   setSyncing: (syncing: boolean) => void;
@@ -39,6 +52,10 @@ export const useAppStore = create<AppState>((set) => ({
   selectedOfId: null,
   isArchiveMode: false,
   isSearchOpen: false,
+  isUserMgmtOpen: false,
+  isPasswordRecovery: false,
+
+  userRole: 'user',
 
   isOnline: navigator.onLine,
   isSyncing: false,
@@ -51,6 +68,9 @@ export const useAppStore = create<AppState>((set) => ({
   setSelectedOf: (id) => set({ selectedOfId: id, isArchiveMode: false }),
   setArchiveMode: (active) => set({ isArchiveMode: active, selectedProjectId: null, selectedOfId: null }),
   setSearchOpen: (open) => set({ isSearchOpen: open }),
+  setUserRole: (role) => set({ userRole: role }),
+  setUserMgmtOpen: (open) => set({ isUserMgmtOpen: open }),
+  setPasswordRecovery: (active) => set({ isPasswordRecovery: active }),
 
   setOnlineStatus: (online) => set({ isOnline: online }),
   setSyncing: (syncing) => set({ isSyncing: syncing }),
@@ -58,3 +78,4 @@ export const useAppStore = create<AppState>((set) => ({
   setPendingMutations: (has) => set({ hasPendingMutations: has }),
   incrementDataVersion: () => set((state) => ({ dataVersion: state.dataVersion + 1 })),
 }));
+

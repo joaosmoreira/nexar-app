@@ -6,10 +6,12 @@ import { ProjectView } from "./components/ProjectView";
 import { OfView } from "./components/OfView";
 import { GlobalDashboard } from "./components/GlobalDashboard";
 import { GlobalSearchModal } from "./components/GlobalSearchModal";
+import { UserManagement } from "./components/UserManagement";
 import { useAppStore } from "./store/useAppStore";
 import {
   runAutoArchive,
   getPendingCount,
+  fetchUserRole,
   createProjetoRemote,
   createOFRemote,
   toggleTarefaConcluidaRemote,
@@ -21,6 +23,7 @@ import {
 } from "./services/api";
 import { flushPendingMutations } from "./services/offlineCache";
 import { Auth } from "./components/Auth";
+import { PasswordReset } from "./components/PasswordReset";
 import { supabase } from "./supabaseClient";
 
 function App() {
@@ -30,10 +33,15 @@ function App() {
     setSearchOpen,
     session,
     setUser,
+    setUserRole,
     setOnlineStatus,
     setSyncing,
     setLastSyncAt,
     setPendingMutations,
+    isUserMgmtOpen,
+    dataVersion,
+    isPasswordRecovery,
+    setPasswordRecovery,
   } = useAppStore();
   const [loading, setLoading] = useState(true);
 
@@ -46,12 +54,24 @@ function App() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null, session);
+      if (event === 'PASSWORD_RECOVERY') {
+        setPasswordRecovery(true);
+      }
     });
 
     return () => subscription.unsubscribe();
   }, [setUser]);
+
+  // ── Fetch role after login (e sempre que dataVersion mudar) ───
+  useEffect(() => {
+    if (session) {
+      fetchUserRole().then((role) => setUserRole(role)).catch(() => setUserRole('user'));
+    } else {
+      setUserRole('user');
+    }
+  }, [session, setUserRole, dataVersion]);
 
   // ── CMD+K global search ───────────────────────────────────────
   useEffect(() => {
@@ -167,6 +187,10 @@ function App() {
     return <Auth />;
   }
 
+  if (isPasswordRecovery) {
+    return <PasswordReset />;
+  }
+
   return (
     <div className="flex h-screen bg-slate-950 text-slate-100 font-sans overflow-hidden">
       {/* Sidebar - FIXED 280px */}
@@ -177,13 +201,15 @@ function App() {
         <GlobalSearchModal />
 
         {/* Dynamic routing based on Zustand state */}
-        {!selectedProjectId && !selectedOfId && <GlobalDashboard />}
+        {selectedOfId && <OfView ofId={selectedOfId} />}
 
-        {selectedProjectId && !selectedOfId && (
+        {!selectedOfId && selectedProjectId && (
           <ProjectView projetoId={selectedProjectId} />
         )}
 
-        {selectedOfId && <OfView ofId={selectedOfId} />}
+        {!selectedOfId && !selectedProjectId && isUserMgmtOpen && <UserManagement />}
+
+        {!selectedOfId && !selectedProjectId && !isUserMgmtOpen && <GlobalDashboard />}
       </main>
     </div>
   );
