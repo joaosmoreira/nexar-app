@@ -13,196 +13,99 @@
 
 ---
 
-## 📌 O que é o Nexar HUB
+## 📌 Visão Geral
 
-O **Nexar HUB** é uma aplicação desktop nativa (macOS + Windows) de gestão industrial construída com **Tauri v2**. Foi concebida para substituir folhas de cálculo Excel dispersas nas fábricas, oferecendo um ambiente sombrio (Dark Mode), ultrarrápido e **offline-first** para monitorizar:
+O **Nexar HUB** é uma solução desktop nativa (Windows & macOS) desenvolvida com **Tauri v2** para a gestão e monitorização de fluxos de trabalho industriais. Projetada para substituir a fragmentação de ficheiros Excel, a aplicação oferece um ambiente centralizado, seguro e **offline-first** para o controlo total da produção.
 
-- **Obras / Projetos** — A entidade-mestre de cada encomenda de produção
-- **Ordens de Fabrico (O.F.s)** — As fases de execução dentro de cada Obra
-- **Tarefas de Trabalho** — Os passos de produção de cada O.F., totalmente reordenáveis (Drag & Drop)
-
-Os dados são sincronizados em tempo real com a cloud via **Supabase (PostgreSQL)** quando há internet, e gravados localmente em cache quando offline.
+### Estrutura de Dados
+- **Obras**: Projetos mestres que agrupam toda a produção de um cliente.
+- **Ordens de Fabrico (O.F.s)**: Sub-entidades que representam fases ou lotes específicos de fabrico.
+- **Tarefas**: Passos operacionais dentro de cada OF, com controlo de conclusão e ordenação.
 
 ---
 
-## 🚀 Funcionalidades Principais
+## 🚀 Funcionalidades Atuais
 
-### 🔐 Autenticação Multi-Utilizador
-- Login seguro com email + password via **Supabase Auth**
-- Cada utilizador vê **apenas os seus próprios dados** — os projetos de um utilizador são completamente invisíveis para outro
-- Isolamento garantido por **Row Level Security (RLS)** ao nível da base de dados
+### 🔐 Autenticação e Hierarquia (v2.0)
+- **Segurança Nativa**: Login/Logout geridos via Supabase Auth.
+- **Isolamento Total**: Dados confinados por utilizador através de Row Level Security (RLS).
+- **Gestão de Equipa**: Interface administrativa para gestão de utilizadores e atribuição de cargos (Admin vs User).
 
-### 📴 Modo Offline-First
-- A app funciona **completamente sem internet**
-- Quando online: dados carregados do Supabase e guardados em cache local (`nexar-cache.json`) na pasta AppData do sistema
-- Quando offline: dados servidos do cache local — leitura e escrita funcionam normalmente
-- Escritas offline ficam em fila (`nexar-pending.json`) e são **sincronizadas automaticamente** ao voltar online
-- IDs temporários (negativos) são resolvidos para IDs reais do Supabase durante o flush
+### 📴 Arquitetura Offline-First
+- **Full Sync**: A app funciona 100% sem internet, utilizando cache local em ficheiros JSON.
+- **Mutation Queue**: Todas as ações realizadas offline são colocadas em fila e sincronizadas automaticamente ao detetar ligação.
+- **Resolução de IDs**: Sistema inteligente que resolve IDs temporários (offline) para IDs reais de base de dados durante o sync.
 
-### 📝 Ecossistema de Notas e Produtividade (Novo)
-- **Informações Gerais da Obra**: Bloco de anotações persistente e partilhado no sumário visual de cada projeto.
-- **Micro-Dossiê por OF**: Cada Ordem de Fabrico dispõe do seu próprio painel reservado de observações, que é lido também da página mãe para facilidade visual!
-- **Edição Inline**: Títulos das OFs e nomenclatura das tarefas podem ser ajustados ou apagados com um simples clique.
-- **Drag & Drop**: As tarefas da OF podem ser arrastadas e reordenadas manualmente sem perder sincronização ao base de dados.
+### 📊 Dashboard e Monitorização
+- **Visão Global**: Painel de mosaicos interativos com progresso real de todas as obras.
+- **Alertas de Atraso**: Identificação visual automática de projetos inativos ou OFs com prazos críticos.
+- **Auto-Arquivo**: Motor inteligente que arquiva obras concluídas e sem movimento após 7 dias.
 
-### 🧩 Dashboard Global
-- Mosaico interativo de relance com todas as Obras
-- Progresso calculado em tempo real (% de tarefas concluídas)
-- Alertas visuais de atraso para priorização: ⚠️ âmbar (>14 dias) e 🔴 vermelho (>21 dias) inativas
+### 🖱️ UX Premium e Organização (Novo)
+- **Total Drag & Drop**: Ordenação manual de obras na sidebar e tarefas nas OFs com interface fluida.
+- **Ordenação Inteligente**: Obras concluídas descem automaticamente para o fundo da lista, mantendo as obras ativas no topo.
+- **Navegação Persistente**: Correção de fluxo de sessão que garante um arranque sempre limpo no dashboard.
+- **Pesquisa Global (CMD+K)**: Paleta de comandos para localização instantânea de qualquer projeto ou OF.
 
-### ⏱️ Motor de Auto-Arquivo
-- Varredura silenciosa: se um Projeto cumpre todos os requisitos a 100% e não tem cliques há mais de **7 dias**, é arquivado debaixo do teu radar.
-
-### 🔍 Pesquisa Global (CMD + K)
-- Paleta global em fullscreen com indexação nativa
-- Pesquisa por strings híbridas de clientes, referência do projeto e número de O.F.
-
-### 📂 Exportador Dual-Engine Nativo
-- Processador de download direto de arrays para **`.xlsx`** (Excel) ou backup estrutural em **`.json`**.
-- Dialogs controlados pelo sistema operativo via `@tauri-apps/plugin-dialog`
-- Sistema estrito de FileSystem nativo resolvido e enquadrado com o motor de `ACL Rights` do ambiente restrito Apple!
+### 📂 Exportação e Relatórios
+- **Excel Profissional**: Exportação de relatórios de progresso com formatação corporativa, estilos aplicados e detalhe de tarefas.
+- **JSON Backup**: Capacidade de extrair dados estruturados para backup ou análise externa.
+- **Integração OS**: Botão "Abrir" direto no toast de sucesso para acesso imediato aos ficheiros exportados.
 
 ---
 
 ## 🏗️ Historial de Desenvolvimento
 
-| Fase | Foco | Destaques Técnicos |
+| Fase | Título | Descrição e Conquistas |
 |:---|:---|:---|
-| **Fase 1 — Fundação** | Backend + UI base | Setup Tauri v2 + React + Vite; ligação Supabase; Sidebar estática |
-| **Fase 2 — Navegação** | Views dinâmicas | `ProjectView` e `OfView`; roteamento por Zustand state |
-| **Fase 3 — Analytics** | Dashboard + Alertas | Mosaicos de métricas; Alertas de atraso; `runAutoArchive` |
-| **Fase 4 — UX Premium** | Search + Export | `CMD+K`; exportação com dialogs nativas Desktop |
-| **Fase 5 — Auth** | Isolamento de dados | Supabase Auth; RLS global; login e dados confinados por user |
-| **Fase 6 — Offline** | Cache + Sync | Leitura/Escrita offline nativa via JSON; Fila Sync e Temp IDs |
-| **Fase 7 — Produtividade**| Drag&Drop | Notas transversais (Obra vs OFs); DND-Kit de Tarefas; Fixes ACL Desktop |
+| **P1** | **Foundations** | Criação do núcleo industrial: Projectos → OFs → Tarefas. Integração base Tauri + Supabase. |
+| **P2** | **Analytics & Visuals** | Desenvolvimento do Dashboard Global e sistema de métricas de progresso em tempo real. |
+| **P3** | **Security & Roles** | Implementação de Multi-User Auth e RLS. Adição do painel de Gestão de Equipa (Admin). |
+| **P4** | **Offline Engine** | Construção do motor de sincronização local e fila de mutações para operação sem rede. |
+| **P5** | **UX & Command** | Implementação da Pesquisa Global (CMD+K) e refinamento estético (Dark Mode premium). |
+| **P6** | **Reporting** | Motor de exportação Excel de alta fidelidade e sistema de backup robusto. |
+| **P7** | **Advanced DND** | Implementação de reordenação total, ordenação dinâmica por status e polimento de UI. |
 
 ---
 
 ## 💻 Stack Técnico
 
-| Camada | Tecnologia | Versão |
-|:---|:---|:---|
-| **Runtime Desktop** | Tauri (Rust) | v2 |
-| **Frontend** | React + TypeScript | 19 / 5.8 |
-| **Bundler** | Vite | v7 |
-| **Estilos** | Tailwind CSS | v4 |
-| **Estado Global** | Zustand | v5 |
-| **Base de Dados** | Supabase (PostgreSQL + Auth) | SDK v2 |
-| **Offline Cache** | `@tauri-apps` FS Plugin | v2 |
-| **Ícones** | Lucide React | v1 |
-| **Excel Export** | SheetJS (xlsx) | v0.18 |
-| **Drag & Drop** | `@dnd-kit` | v6 |
+- **Runtime**: [Tauri v2](https://tauri.app/) (Rust Core)
+- **Frontend**: React 19 + TypeScript 5.8
+- **Estilos**: Tailwind CSS v4 + Lucide Icons
+- **Estado**: Zustand v5
+- **Backend/Auth**: Supabase (PostgreSQL + RLS)
+- **Ordenação**: `@dnd-kit`
+- **Excel**: `xlsx-js-style`
 
 ---
 
-## 🗄️ Base de Dados (Supabase)
+## ⚙️ Instalação e Build
 
-A estrutura completa está formatada dentro do `src/supabase-schema.sql`. O script foi otimizado para a Versão 2.1 e desenolvido de forma **Não-Destrutiva**.
-
-### Tabelas Estruturais
-
-```
-projectos
-├── id                 bigint PK (auto)
-├── user_id            uuid FK → auth.users
-├── nome               text
-├── cliente            text
-├── arquivado          boolean
-├── informacoes_gerais text       [Bloco amplo de notas da obra]
-├── ultimo_movimento   timestamp
-└── criado_em          timestamp
-
-ordens_fabrico
-├── id          bigint PK
-├── user_id     uuid FK → auth.users
-├── projeto_id  bigint FK → projectos(id)
-├── nome_of     text
-├── numero_of   text
-├── notas       text       [Anotações técnicas exclusivas]
-├── status      text       'pendente' | 'em_progresso' | 'concluido'
-└── criado_em   timestamp
-
-tarefas
-├── id          bigint PK
-├── user_id     uuid FK → auth.users
-├── ordem_id    bigint FK → ordens_fabrico(id)
-├── nome_tarefa text
-├── concluido   boolean
-└── ordem_index int8       [Gere a posição orgânica na vista e Drag Drop]
-```
-
-### Isolamento de Dados (RLS)
-
-Cada tabela está trancada por uma muralha de acesso através desta política:
-```sql
-USING (auth.uid() = user_id)
-```
-Isto assegura que **um utilizador nunca acede a Obras ou Tarefas de outro colega**, mesmo que ambos acedam ao HUB pela mesma instância global de Supabase.
-
----
-
-## ⚙️ Setup e Construção
-
-### Pré-requisitos
-
-- Node.js ≥ 20
-- Rust + Cargo (via [rustup](https://rustup.rs))
+### Requisitos
+- Node.js ≥ 22
+- Rust (via rustup)
 - Tauri CLI v2
 
-### Instalação
-
+### Setup
 ```bash
-# 1. Clonar O Repositório
-git clone <repo-url>
-cd work-manager
-
-# 2. Instalar dependências pesadas
 npm install
-
-# 3. Criar a raiz de ambiente e ligar o Backend
-cp .env.example .env
-# Adicionar: VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY
+npm run tauri dev
 ```
 
-### Comandos de Suporte
-
+### Build para Produção
 ```bash
-# Correr o emulador interativo Browser/Tauri Window:
-npm run tauri dev
-
-# Exigir ao Desktop que coza a aplicação (.App, .Dmg, .Exe):
 npm run tauri build
 ```
 
 ---
 
-## 🍎 Instalação no macOS (App distribuída)
+## 🍎 Notas macOS
+A aplicação dispõe de suporte nativo para arquitetura Apple Silicon (ARM64). Devido a restrições do Gatekeeper:
+- Após instalar na pasta `Aplicações`, abrir as **Definições do Sistema > Privacidade e Segurança**.
+- Clique em **"Abrir Mesmo Assim"** após o primeiro bloqueio do sistema.
 
-> [!IMPORTANT]
-> O executável gerado é assinado internamente de forma **ad-hoc** (não dispõe de Certificados Públicos Autorizados pela Mação). Significa que a app será apanhada pelas firewalls do Gatekeeper no primeiro e único arranque livre.
-
-### Método 1 — System Settings (Recomendado)
-
-1. Abrir o pacote instalador do `.dmg`.
-2. Arrastar o logótipo amarelo `Nexar HUB` para os teus atalhos / pasta `Aplicações`.
-3. Clica para abrir → Vai saltar o protesto da macã "Não Autorizado!". Clica OK/Fechar.
-4. Entra em **Definições do Sistema → Privacidade e Segurança**.
-5. Faz scrool até meio e diz ao sistema: **"Nexar HUB foi bloqueada mas confio! → Abrir Mesmo Assim"** 
-
-### Método 2 — Desbloqueio via Terminal
-
-Limpa a restrição diretamente no diretório das Aplicações:
-
-```bash
-xattr -rd com.apple.quarantine "/Applications/Nexar HUB.app"
-```
-
-## 🔒 Segurança de Rede
-
-> **NUNCA partilhe de que forma for as linhas de acesso que estão escondidas no vosso `.env`. O mural de segurança RLS defende-vos totalmente num browser standard, mas é possível extrair informações se a base de dados for encurralada remotamente**
-
-## 🌿 Flow de Versionamento
-
-| Branch | Propósito Global |
-|:---|:---|
-| `main` | Produção Core Estável (V2.1 - Master Version com Exportação e Sistema de Notas e Offline Ativo) |
+---
+<div align="center">
+  <p>Desenvolvido para excelência industrial e produtividade.</p>
+</div>
