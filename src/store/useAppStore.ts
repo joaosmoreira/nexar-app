@@ -63,7 +63,13 @@ export const useAppStore = create<AppState>((set) => ({
   hasPendingMutations: false,
   dataVersion: 0,
 
-  setUser: (user, session) => set({ user, session }),
+  setUser: (user, session) => set({ 
+    user, 
+    session, 
+    selectedProjectId: null, 
+    selectedOfId: null, 
+    isUserMgmtOpen: false 
+  }),
   setSelectedProject: (id) => set({ selectedProjectId: id, selectedOfId: null, isArchiveMode: false }),
   setSelectedOf: (id) => set({ selectedOfId: id, isArchiveMode: false }),
   setArchiveMode: (active) => set({ isArchiveMode: active, selectedProjectId: null, selectedOfId: null }),

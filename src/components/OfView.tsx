@@ -67,25 +67,16 @@ function SortableTask({ tarefa, onToggle, onDelete, onRenameSubmit }: SortableTa
       ref={setNodeRef}
       style={style}
       className={cn(
-        'group flex items-center gap-3 p-4 rounded-xl border transition-all',
+        'group flex items-center gap-3 p-4 rounded-xl border transition-all select-none',
         tarefa.concluido
           ? 'bg-emerald-500/5 border-emerald-500/20'
           : 'bg-slate-900 border-slate-800 hover:border-slate-700'
       )}
+      {...attributes}
+      {...listeners}
     >
-      {/* Drag handle */}
-      <button
-        className="flex-shrink-0 cursor-grab active:cursor-grabbing text-slate-600 hover:text-slate-400 transition-colors touch-none"
-        {...attributes}
-        {...listeners}
-        onClick={e => e.stopPropagation()}
-        title="Arrastar para reordenar"
-      >
-        <GripVertical size={18} />
-      </button>
-
       {/* Toggle */}
-      <button className="flex-shrink-0" onClick={() => !editing && onToggle(tarefa)}>
+      <button className="flex-shrink-0 relative z-10" onClick={() => !editing && onToggle(tarefa)}>
         {tarefa.concluido
           ? <CheckCircle2 className="text-emerald-500 w-6 h-6 transition-transform hover:scale-110" />
           : <Circle className="text-slate-500 w-6 h-6 transition-transform hover:scale-110" />
@@ -93,7 +84,7 @@ function SortableTask({ tarefa, onToggle, onDelete, onRenameSubmit }: SortableTa
       </button>
 
       {/* Name / inline edit */}
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 pointer-events-none">
         {editing ? (
           <input
             ref={inputRef}
@@ -102,7 +93,7 @@ function SortableTask({ tarefa, onToggle, onDelete, onRenameSubmit }: SortableTa
             onChange={e => setEditValue(e.target.value)}
             onKeyDown={handleKeyDown}
             onBlur={submitEdit}
-            className="w-full bg-slate-800 border border-sky-500/60 text-slate-100 rounded-lg px-3 py-1.5 text-base focus:outline-none focus:ring-1 focus:ring-sky-500"
+            className="w-full bg-slate-800 border border-sky-500/60 text-slate-100 rounded-lg px-3 py-1.5 text-base focus:outline-none focus:ring-1 focus:ring-sky-500 pointer-events-auto"
           />
         ) : (
           <span className={cn('text-base transition-all break-words', tarefa.concluido ? 'text-emerald-500/70 line-through' : 'text-slate-200')}>
@@ -112,7 +103,7 @@ function SortableTask({ tarefa, onToggle, onDelete, onRenameSubmit }: SortableTa
       </div>
 
       {/* Actions */}
-      <div className={cn('flex items-center gap-1 flex-shrink-0 transition-opacity', editing ? 'opacity-100' : 'opacity-0 group-hover:opacity-100')}>
+      <div className={cn('flex items-center gap-1 flex-shrink-0 transition-opacity relative z-10', editing ? 'opacity-100' : 'opacity-0 group-hover:opacity-100')}>
         {editing ? (
           <>
             <button onClick={e => { e.stopPropagation(); submitEdit(); }} className="p-1.5 rounded-lg bg-sky-500/20 text-sky-400 hover:bg-sky-500/30 active:scale-90 transition-all" title="Guardar">

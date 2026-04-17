@@ -6,6 +6,14 @@ import { supabase } from '../supabaseClient';
 import { cn } from '../lib/utils';
 import { Modal } from './Modal';
 import { toast } from 'sonner';
+import {
+  DndContext, closestCenter, PointerSensor, useSensor, useSensors,
+  DragEndEvent, DragOverlay,
+} from '@dnd-kit/core';
+import {
+  arrayMove, SortableContext, useSortable, verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 // ─── Cache de prazos próximos (atualizado 1x/dia ou no arranque) ────────────
 const DEADLINE_CACHE_KEY = 'nexar-deadline-cache';
@@ -35,8 +43,8 @@ function writeDeadlineCache(projectIds: number[], completedProjectIds: number[])
   localStorage.setItem(DEADLINE_CACHE_KEY, JSON.stringify(entry));
 }
 
-async function getProjectsStatusCache(): Promise<{ deadlineIds: number[]; completedIds: number[] }> {
-  const cached = readDeadlineCache();
+async function getProjectsStatusCache(forceRefresh = false): Promise<{ deadlineIds: number[]; completedIds: number[] }> {
+  const cached = forceRefresh ? null : readDeadlineCache();
   if (cached && Date.now() - cached.fetchedAt < DEADLINE_CACHE_TTL_MS) {
     return { deadlineIds: cached.projectIds, completedIds: cached.completedProjectIds || [] };
   }
@@ -52,10 +60,21 @@ async function getProjectsStatusCache(): Promise<{ deadlineIds: number[]; comple
 
 // ─── ProjectItem ──────────────────────────────────────────────────────────────
 
-function ProjectItem({ projeto, deadlineProjectIds, completedProjectIds }: { projeto: Projeto; deadlineProjectIds: number[]; completedProjectIds: number[] }) {
+function ProjectItem({ projeto, deadlineProjectIds, completedProjectIds, isSortable = false }: { projeto: Projeto; deadlineProjectIds: number[]; completedProjectIds: number[]; isSortable?: boolean }) {
   const { selectedProjectId, selectedOfId, setSelectedProject } = useAppStore();
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ 
+    id: projeto.id,
+    disabled: !isSortable 
+  });
+  
   const [ofs, setOfs] = useState<OrdemFabrico[]>([]);
   const [loading, setLoading] = useState(false);
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
 
   const isSelected = selectedProjectId === projeto.id && selectedOfId === null;
   const isExpanded = selectedProjectId === projeto.id;
@@ -105,16 +124,18 @@ function ProjectItem({ projeto, deadlineProjectIds, completedProjectIds }: { pro
   }
 
   return (
-    <div className="mb-2">
+    <div className="mb-2" ref={setNodeRef} style={style}>
       <button
         onClick={() => setSelectedProject(projeto.id)}
         className={cn(
-          "w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group",
+          "w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group select-none",
           isSelected ? "bg-slate-800 text-slate-100" : "hover:bg-slate-800/50 text-slate-400"
         )}
+        {...attributes}
+        {...listeners}
       >
         {folderIcon}
-        <div className="flex-1 text-left truncate">
+        <div className="flex-1 text-left truncate pointer-events-none">
            <div className="text-[10px] font-bold tracking-widest uppercase text-sky-500/70 mb-0.5">{ref}</div>
            <div className="text-[13px] font-medium leading-tight truncate text-slate-300 group-hover:text-slate-100 transition-colors">{projNameOnly}</div>
         </div>
@@ -262,6 +283,34 @@ export function Sidebar() {
   const [allUsers, setAllUsers] = useState<UserWithRole[]>([]);
   const isAdmin = userRole === 'admin';
 
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const [activeId, setActiveId] = useState<number | null>(null);
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    setActiveId(null);
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    // Apenas permitimos reordenar projetos ativos no modo normal (não arquivado)
+    if (isArchiveMode) return;
+
+    const oldIndex = projetos.findIndex(p => p.id === active.id);
+    const newIndex = projetos.findIndex(p => p.id === over.id);
+
+    // Filter to get only the sortable projects (outrosProjetos)
+    // Actually simpler: reorder the main array and map indexes
+    const reordered = arrayMove(projetos, oldIndex, newIndex).map((p, i) => ({ ...p, ordem_index: i }));
+    setProjetos(reordered);
+
+    try {
+      const { reorderProjetos } = await import('../services/api');
+      await reorderProjetos(reordered.map(p => ({ id: p.id, ordem_index: p.ordem_index || 0 })));
+    } catch (e: any) {
+      toast.error('Erro ao reordenar projetos: ' + e.message);
+      loadProjetos();
+    }
+  };
+
   // Password change state
   const [pwModalOpen, setPwModalOpen] = useState(false);
   const [newPw, setNewPw] = useState('');
@@ -296,6 +345,11 @@ export function Sidebar() {
   const loadProjetos = async (silent = false) => {
     if (!silent) setLoading(true);
     try {
+      // Sempre que recarregamos, refrescamos também o estado de conclusão (ignorando cache se não for silent)
+      const { deadlineIds, completedIds } = await getProjectsStatusCache(!silent);
+      setDeadlineProjectIds(deadlineIds);
+      setCompletedProjectIds(completedIds);
+
       const data = isArchiveMode ? await fetchProjetosArquivados() : await fetchProjetos();
       setProjetos(data);
       // Atualizar a última data de sincronização visual
@@ -417,7 +471,17 @@ export function Sidebar() {
 
   // Separar GS0000 dos restantes projetos
   const gs0000 = myProjetos.find(p => p.nome.startsWith('GS0000'));
-  const outrosProjetos = myProjetos.filter(p => !p.nome.startsWith('GS0000'));
+  const outrosProjetos = myProjetos
+    .filter(p => !p.nome.startsWith('GS0000'))
+    .sort((a, b) => {
+      // Regra: Obras concluídas passam sempre para baixo
+      const aDone = completedProjectIds.includes(a.id);
+      const bDone = completedProjectIds.includes(b.id);
+      if (aDone !== bDone) return aDone ? 1 : -1;
+      
+      // Dentro de cada grupo, manter a ordenação manual (index)
+      return (a.ordem_index ?? 0) - (b.ordem_index ?? 0);
+    });
 
   // Agrupamento por utilizador (vista admin)
   const userGroupMap = new Map<string, { userInfo: UserWithRole; projetos: Projeto[] }>();
@@ -574,22 +638,37 @@ export function Sidebar() {
           </div>
         ) : (
           /* ── Vista Normal: flat ───────────────────────────── */
-          <>
-            {/* GS0000 — sempre fixo no topo */}
-            {gs0000 && (
-              <div className="mb-1">
-                <div className="px-3 py-1 mb-1">
-                  <span className="text-[9px] font-bold tracking-widest uppercase text-slate-600">Trabalhos Gerais</span>
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={(e) => setActiveId(e.active.id as number)} onDragEnd={handleDragEnd}>
+            <SortableContext items={outrosProjetos.map(p => p.id)} strategy={verticalListSortingStrategy}>
+              {/* GS0000 — sempre fixo no topo */}
+              {gs0000 && (
+                <div className="mb-1">
+                  <div className="px-3 py-1 mb-1">
+                    <span className="text-[9px] font-bold tracking-widest uppercase text-slate-600">Trabalhos Gerais</span>
+                  </div>
+                  <ProjectItem key={gs0000.id} projeto={gs0000} deadlineProjectIds={deadlineProjectIds} completedProjectIds={completedProjectIds} isSortable={false} />
+                  {outrosProjetos.length > 0 && <div className="my-2 border-t border-slate-800/60" />}
                 </div>
-                <ProjectItem key={gs0000.id} projeto={gs0000} deadlineProjectIds={deadlineProjectIds} completedProjectIds={completedProjectIds} />
-                {outrosProjetos.length > 0 && <div className="my-2 border-t border-slate-800/60" />}
-              </div>
-            )}
-            {/* Restantes projetos */}
-            {outrosProjetos.map(p => (
-              <ProjectItem key={p.id} projeto={p} deadlineProjectIds={deadlineProjectIds} completedProjectIds={completedProjectIds} />
-            ))}
-          </>
+              )}
+              {/* Restantes projetos */}
+              {outrosProjetos.map(p => (
+                <ProjectItem key={p.id} projeto={p} deadlineProjectIds={deadlineProjectIds} completedProjectIds={completedProjectIds} isSortable={!isArchiveMode} />
+              ))}
+            </SortableContext>
+            
+            <DragOverlay>
+              {activeId ? (
+                <div className="bg-slate-800 border border-sky-500/50 rounded-lg p-2 opacity-90 shadow-2xl flex items-center gap-3">
+                  <div className="w-6 h-6 rounded bg-sky-500/20 flex items-center justify-center">
+                    <Folder size={14} className="text-sky-400" />
+                  </div>
+                  <span className="text-sm text-slate-200 truncate">
+                    {projetos.find(p => p.id === activeId)?.nome}
+                  </span>
+                </div>
+              ) : null}
+            </DragOverlay>
+          </DndContext>
         )}
       </div>
 

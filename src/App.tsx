@@ -20,6 +20,7 @@ import {
   deleteOrdemFabricoRemote,
   createTarefaRemote,
   updateProjectoUltimoMovimentoRemote,
+  reorderProjetosRemote,
 } from "./services/api";
 import { flushPendingMutations } from "./services/offlineCache";
 import { Auth } from "./components/Auth";
@@ -110,6 +111,7 @@ function App() {
         deleteOrdemFabricoRemote,
         createTarefaRemote,
         updateProjectoUltimoMovimentoRemote,
+        reorderProjetosRemote,
       };
 
       try {

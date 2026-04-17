@@ -27,6 +27,7 @@ export type MutationAction =
   | { action: 'updateTarefa'; tarefaId: number; nome: string }
   | { action: 'deleteTarefa'; tarefaId: number }
   | { action: 'reorderTarefas'; tarefas: { id: number; ordem_index: number }[] }
+  | { action: 'reorderProjetos'; projetos: { id: number; ordem_index: number }[] }
   | { action: 'updateProjetoNotas'; projetoId: number; notas: string };
 
 interface PendingQueue {
@@ -134,6 +135,7 @@ export interface RemoteApi {
   updateTarefaRemote?: (tarefaId: number, nome: string) => Promise<void>;
   deleteTarefaRemote?: (tarefaId: number) => Promise<void>;
   reorderTarefasRemote?: (tarefas: { id: number; ordem_index: number }[]) => Promise<void>;
+  reorderProjetosRemote?: (projetos: { id: number; ordem_index: number }[]) => Promise<void>;
   updateProjetoNotasRemote?: (projetoId: number, notas: string) => Promise<void>;
 }
 
@@ -248,6 +250,14 @@ export async function flushPendingMutations(api: RemoteApi): Promise<{ flushed: 
           if (api.reorderTarefasRemote) {
             const translated = mut.tarefas.map(t => ({ id: resolveId(t.id), ordem_index: t.ordem_index }));
             await api.reorderTarefasRemote(translated);
+          }
+          flushed++;
+          break;
+        }
+        case 'reorderProjetos': {
+          if (api.reorderProjetosRemote) {
+            const translated = mut.projetos.map(p => ({ id: resolveId(p.id), ordem_index: p.ordem_index }));
+            await api.reorderProjetosRemote(translated);
           }
           flushed++;
           break;

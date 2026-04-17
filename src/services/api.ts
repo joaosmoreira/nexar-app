@@ -16,6 +16,7 @@ export interface Projeto {
   criado_em: string;
   arquivado?: boolean;
   informacoes_gerais?: string;
+  ordem_index?: number;
 }
 
 export interface OrdemFabrico {
@@ -48,7 +49,7 @@ export async function fetchProjetos(): Promise<Projeto[]> {
       .from('projectos')
       .select('*')
       .or('arquivado.eq.false,arquivado.is.null')
-      .order('criado_em', { ascending: false });
+      .order('ordem_index', { ascending: true });
     if (error) throw error;
     const projetos = data as Projeto[];
     await patchCache({ projetos });
@@ -65,7 +66,7 @@ export async function fetchProjetosArquivados(): Promise<Projeto[]> {
       .from('projectos')
       .select('*')
       .eq('arquivado', true)
-      .order('criado_em', { ascending: false });
+      .order('criado_em', { ascending: false }); // Arquivados ainda por data por agora? Ou index? O user disse obras, assumo as ativas.
     if (error) throw error;
     const projetoArquivados = data as Projeto[];
     await patchCache({ projetoArquivados });
@@ -605,6 +606,20 @@ export async function reorderTarefas(tarefas: { id: number; ordem_index: number 
   }
 }
 
+export async function reorderProjetos(projetos: { id: number; ordem_index: number }[]) {
+  if (isOnline()) {
+    await reorderProjetosRemote(projetos);
+  } else {
+    const cache = await readCache();
+    const indexMap = new Map(projetos.map(p => [p.id, p.ordem_index]));
+    const updated = (cache.projetos || []).map((p: any) =>
+      indexMap.has(p.id) ? { ...p, ordem_index: indexMap.get(p.id) } : p
+    );
+    await patchCache({ projetos: updated });
+    await queueMutation({ action: 'reorderProjetos', projetos });
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────
 //  FUNÇÕES REMOTE (chamadas diretas Supabase — usadas pelo flush)
 // ─────────────────────────────────────────────────────────────────
@@ -744,6 +759,14 @@ export async function reorderTarefasRemote(tarefas: { id: number; ordem_index: n
   await Promise.all(
     tarefas.map(t =>
       supabase.from('tarefas').update({ ordem_index: t.ordem_index }).eq('id', t.id)
+    )
+  );
+}
+
+export async function reorderProjetosRemote(projetos: { id: number; ordem_index: number }[]) {
+  await Promise.all(
+    projetos.map(p =>
+      supabase.from('projectos').update({ ordem_index: p.ordem_index }).eq('id', p.id)
     )
   );
 }
