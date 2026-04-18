@@ -132,10 +132,13 @@ function SortableTask({ tarefa, onToggle, onDelete, onRenameSubmit }: SortableTa
 
 export function OfView({ ofId }: { ofId: number }) {
   const dataVersion = useAppStore(state => state.dataVersion);
-  const [ofData, setOfData] = useState<OrdemFabrico | null>(null);
+  const cachedOf = useAppStore(state => state.ofs.find(o => o.id === ofId));
+  const cachedProject = useAppStore(state => state.projects.find(p => p.id === cachedOf?.projeto_id));
+
+  const [ofData, setOfData] = useState<OrdemFabrico | null>(cachedOf || null);
   const [tarefas, setTarefas] = useState<Tarefa[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [projectName, setProjectName] = useState('');
+  const [loading, setLoading] = useState(!cachedOf);
+  const [projectName, setProjectName] = useState(cachedProject?.nome || '');
   const [modalOpen, setModalOpen] = useState(false);
   const [newTaskName, setNewTaskName] = useState('');
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -143,9 +146,9 @@ export function OfView({ ofId }: { ofId: number }) {
   const [editingOfName, setEditingOfName] = useState(false);
   const [editOfValue, setEditOfValue] = useState('');
   const [activeId, setActiveId] = useState<number | null>(null);
-  const [notas, setNotas] = useState('');
-  const [initialNotas, setInitialNotas] = useState('');
-  const [prazoLimite, setPrazoLimite] = useState<string | null>(null);
+  const [notas, setNotas] = useState(cachedOf?.notas || '');
+  const [initialNotas, setInitialNotas] = useState(cachedOf?.notas || '');
+  const [prazoLimite, setPrazoLimite] = useState<string | null>(cachedOf?.prazo_limite || null);
   const [editingPrazo, setEditingPrazo] = useState(false);
   const [prazoEditValue, setPrazoEditValue] = useState('');
   const ofNameInputRef = useRef<HTMLInputElement>(null);
@@ -153,7 +156,7 @@ export function OfView({ ofId }: { ofId: number }) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   const loadData = async (silent = false) => {
-    if (!silent) setLoading(true);
+    if (!silent && !ofData) setLoading(true);
     const { data: oData } = await supabase
       .from('ordens_fabrico')
       .select('*, projectos(nome)')
@@ -168,13 +171,21 @@ export function OfView({ ofId }: { ofId: number }) {
     }
     const tData = await fetchTarefasByOf(ofId);
     setTarefas(tData);
-    if (!silent) setLoading(false);
+    setLoading(false);
   };
 
   const firstLoad = useRef(true);
   const previousOfId = useRef(ofId);
 
   useEffect(() => { 
+    if (cachedOf) {
+      setOfData(cachedOf);
+      setNotas(cachedOf.notas || '');
+      setInitialNotas(cachedOf.notas || '');
+      setPrazoLimite(cachedOf.prazo_limite || null);
+      if (cachedProject) setProjectName(cachedProject.nome);
+    }
+
     const isSilent = previousOfId.current === ofId && !firstLoad.current;
     loadData(isSilent);
     firstLoad.current = false;

@@ -1,7 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useAppStore } from '../store/useAppStore';
-import { fetchProjetos, fetchOfsByProjeto, createProjeto, fetchProjetosArquivados, fetchOfsWithDeadlineSoon, fetchProjectsCompletionStatus, fetchAllUsers, Projeto, OrdemFabrico, UserWithRole } from '../services/api';
-import { Folder, FileCog, Layers, Plus, Archive, AlertTriangle, CheckCircle2, Search, LogOut, User, Users, Wifi, WifiOff, RefreshCw, ChevronRight, KeyRound } from 'lucide-react';
+import { 
+  createProjeto, reorderProjetos,
+  Projeto, UserWithRole 
+} from '../services/api';
+import { Layers, Plus, Archive, Search, LogOut, User, Users, Wifi, WifiOff, RefreshCw, KeyRound, Folder } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { cn } from '../lib/utils';
 import { Modal } from './Modal';
@@ -11,277 +14,30 @@ import {
   DragEndEvent, DragOverlay,
 } from '@dnd-kit/core';
 import {
-  arrayMove, SortableContext, useSortable, verticalListSortingStrategy,
+  arrayMove, SortableContext, verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 
-// ─── Cache de prazos próximos (atualizado 1x/dia ou no arranque) ────────────
-const DEADLINE_CACHE_KEY = 'nexar-deadline-cache';
-const DEADLINE_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 horas
-
-interface DeadlineCache {
-  fetchedAt: number;
-  projectIds: number[];          // OFs com prazo < 7 dias
-  completedProjectIds: number[]; // Projetos com todas as OFs concluídas
-}
-
-function readDeadlineCache(): DeadlineCache | null {
-  try {
-    const raw = localStorage.getItem(DEADLINE_CACHE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as DeadlineCache;
-    // Invalida o cache se o campo completedProjectIds estiver em falta (formato antigo)
-    if (!Array.isArray(parsed.completedProjectIds)) return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-function writeDeadlineCache(projectIds: number[], completedProjectIds: number[]) {
-  const entry: DeadlineCache = { fetchedAt: Date.now(), projectIds, completedProjectIds };
-  localStorage.setItem(DEADLINE_CACHE_KEY, JSON.stringify(entry));
-}
-
-async function getProjectsStatusCache(forceRefresh = false): Promise<{ deadlineIds: number[]; completedIds: number[] }> {
-  const cached = forceRefresh ? null : readDeadlineCache();
-  if (cached && Date.now() - cached.fetchedAt < DEADLINE_CACHE_TTL_MS) {
-    return { deadlineIds: cached.projectIds, completedIds: cached.completedProjectIds || [] };
-  }
-  // Cache expirada ou inexistente — vai buscar ambos em paralelo
-  const [ofs, completedIds] = await Promise.all([
-    fetchOfsWithDeadlineSoon(),
-    fetchProjectsCompletionStatus(),
-  ]);
-  const deadlineIds = [...new Set(ofs.map(o => o.projeto_id))];
-  writeDeadlineCache(deadlineIds, completedIds);
-  return { deadlineIds, completedIds };
-}
-
-// ─── ProjectItem ──────────────────────────────────────────────────────────────
-
-function ProjectItem({ projeto, deadlineProjectIds, completedProjectIds, isSortable = false }: { projeto: Projeto; deadlineProjectIds: number[]; completedProjectIds: number[]; isSortable?: boolean }) {
-  const { selectedProjectId, selectedOfId, setSelectedProject } = useAppStore();
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ 
-    id: projeto.id,
-    disabled: !isSortable 
-  });
-  
-  const [ofs, setOfs] = useState<OrdemFabrico[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  };
-
-  const isSelected = selectedProjectId === projeto.id && selectedOfId === null;
-  const isExpanded = selectedProjectId === projeto.id;
-
-  // Carrega OFs apenas se expandido
-  useEffect(() => {
-    if (isExpanded) {
-      setLoading(true);
-      fetchOfsByProjeto(projeto.id).then(data => {
-        const formatted = data.map((d: any) => {
-          const total = d.tarefas?.length || 1;
-          const concluidas = d.tarefas?.filter((t: any) => t.concluido).length || 0;
-          return { ...d, progress: Math.round((concluidas / total) * 100) };
-        });
-
-        formatted.sort((a: any, b: any) => {
-           const aDone = a.progress === 100 ? 1 : 0;
-           const bDone = b.progress === 100 ? 1 : 0;
-           if (aDone !== bDone) return aDone - bDone;
-           // Both open/closed. Order oldest first (first to be created is prioritized)
-           return new Date(a.criado_em).getTime() - new Date(b.criado_em).getTime();
-        });
-
-        setOfs(formatted);
-        setLoading(false);
-      });
-    }
-  }, [isExpanded, projeto.id]);
-
-  const [ref, ...rest] = projeto.nome.split(" - ");
-  const projNameOnly = rest.length > 0 ? rest.join(" - ") : (projeto.cliente || projeto.nome);
-
-  // Determinar ícone da pasta — completedProjectIds já vem do cache (sem depender do isExpanded)
-  const allDone = completedProjectIds.includes(projeto.id);
-  // Atualiza também quando o projeto está expandido e as OFs foram carregadas localmente
-  const allDoneLocal = ofs.length > 0 && ofs.every((o: any) => o.progress === 100);
-  const isCompleted = allDone || (isExpanded && allDoneLocal);
-  const hasDeadlineSoon = deadlineProjectIds.includes(projeto.id);
-
-  let folderIcon;
-  if (isCompleted) {
-    folderIcon = <CheckCircle2 size={18} className="shrink-0 text-emerald-500" />;
-  } else if (hasDeadlineSoon) {
-    folderIcon = <AlertTriangle size={18} className={cn("shrink-0 transition-colors", isSelected ? "text-amber-400" : "text-amber-500")} />;
-  } else {
-    folderIcon = <Folder size={18} className={cn("shrink-0 transition-colors", isSelected ? "text-sky-400" : "text-sky-500/50")} />;
-  }
-
-  return (
-    <div className="mb-2" ref={setNodeRef} style={style}>
-      <button
-        onClick={() => setSelectedProject(projeto.id)}
-        className={cn(
-          "w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group select-none",
-          isSelected ? "bg-slate-800 text-slate-100" : "hover:bg-slate-800/50 text-slate-400"
-        )}
-        {...attributes}
-        {...listeners}
-      >
-        {folderIcon}
-        <div className="flex-1 text-left truncate pointer-events-none">
-           <div className="text-[10px] font-bold tracking-widest uppercase text-sky-500/70 mb-0.5">{ref}</div>
-           <div className="text-[13px] font-medium leading-tight truncate text-slate-300 group-hover:text-slate-100 transition-colors">{projNameOnly}</div>
-        </div>
-      </button>
-
-      {isExpanded && (
-        <div className="ml-[22px] mt-1 pl-3 border-l border-slate-800 overflow-hidden space-y-1">
-          {loading ? (
-            <div className="text-xs text-slate-500 px-3 py-1">A carregar...</div>
-          ) : ofs.length === 0 ? (
-            <div className="text-xs text-slate-500 px-3 py-1">Sem ordens de fabrico</div>
-          ) : (
-            ofs.map((of) => (
-              <OfItem key={of.id} ofData={of} />
-            ))
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function OfItem({ ofData }: { ofData: OrdemFabrico }) {
-  const { selectedOfId, setSelectedOf } = useAppStore();
-  const isSelected = selectedOfId === ofData.id;
-
-  const progresso = ofData.tarefas && ofData.tarefas.length > 0 
-    ? (ofData.tarefas.filter(t => t.concluido).length / ofData.tarefas.length) * 100 
-    : 0;
-
-  const ageMs = Date.now() - new Date(ofData.criado_em).getTime();
-  const ageDays = ageMs / (1000 * 60 * 60 * 24);
-
-  // Verificar prazo limite
-  const now = Date.now();
-  const prazoMs = ofData.prazo_limite ? new Date(ofData.prazo_limite).getTime() - now : null;
-  const prazoEmDias = prazoMs !== null ? prazoMs / (1000 * 60 * 60 * 24) : null;
-  const prazoUrgente = prazoEmDias !== null && prazoEmDias <= 7 && prazoEmDias >= 0 && progresso < 100;
-  const prazoExpirado = prazoEmDias !== null && prazoEmDias < 0 && progresso < 100;
-
-  let iconToRender;
-  if (progresso >= 100) {
-     iconToRender = <CheckCircle2 size={16} className="text-emerald-500" />;
-  } else if (prazoExpirado) {
-     iconToRender = <AlertTriangle size={16} className="text-red-500" />;
-  } else if (prazoUrgente) {
-     iconToRender = <AlertTriangle size={16} className="text-amber-400" />;
-  } else if (ageDays > 21) {
-     iconToRender = <AlertTriangle size={16} className="text-red-500" />;
-  } else if (ageDays > 14) {
-     iconToRender = <AlertTriangle size={16} className="text-amber-500" />;
-  } else {
-     iconToRender = <FileCog size={16} className={cn("transition-colors", isSelected ? "text-amber-400" : "text-slate-500 group-hover:text-amber-400/50")} />;
-  }
-
-  return (
-    <button
-      onClick={() => setSelectedOf(ofData.id)}
-      className={cn(
-        "w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group",
-        isSelected ? "bg-slate-800 text-slate-100" : "hover:bg-slate-800/50 text-slate-400"
-      )}
-    >
-      <div className="relative shrink-0 flex items-center">
-         {iconToRender}
-      </div>
-
-      <div className="flex-1 text-left truncate">
-         <div className={cn("font-medium text-[12px] truncate", isSelected ? "text-white" : "text-slate-300 group-hover:text-white transition-colors")}>
-            {ofData.numero_of}
-         </div>
-         <div className="text-[10px] uppercase tracking-wider opacity-60 truncate text-slate-400">{ofData.nome_of}</div>
-      </div>
-    </button>
-  );
-}
-
-// ─── AdminUserGroup — Nível de utilizador na vista admin ──────────────────────
-
-function AdminUserGroup({ userInfo, projetos, deadlineProjectIds, completedProjectIds }: {
-  userInfo: UserWithRole;
-  projetos: Projeto[];
-  deadlineProjectIds: number[];
-  completedProjectIds: number[];
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const currentUserId = useAppStore.getState().user?.id;
-  const isCurrentUser = userInfo.user_id === currentUserId;
-  const emailLabel = userInfo.email.split('@')[0];
-
-  return (
-    <div className="mb-1">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className={cn(
-          "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all group",
-          expanded ? "bg-violet-500/10 text-violet-300" : "hover:bg-slate-800/50 text-slate-400"
-        )}
-      >
-        <ChevronRight
-          size={14}
-          className={cn(
-            "shrink-0 transition-transform duration-200",
-            expanded && "rotate-90"
-          )}
-        />
-        <div className={cn(
-          "w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold shrink-0",
-          isCurrentUser
-            ? "bg-violet-500/15 text-violet-300 border border-violet-500/25"
-            : "bg-sky-500/10 text-sky-400 border border-sky-500/20"
-        )}>
-          {emailLabel[0].toUpperCase()}
-        </div>
-        <div className="flex-1 text-left truncate">
-          <div className="text-[12px] font-medium truncate">{emailLabel}</div>
-          <div className="text-[10px] opacity-50 truncate">{projetos.length} obra{projetos.length !== 1 ? 's' : ''}</div>
-        </div>
-        {isCurrentUser && (
-          <span className="text-[9px] text-violet-400/60 bg-violet-500/10 px-1.5 py-0.5 rounded font-medium shrink-0">Tu</span>
-        )}
-      </button>
-
-      {expanded && (
-        <div className="ml-3 mt-1 pl-3 border-l border-slate-800 space-y-0.5">
-          {projetos.length === 0 ? (
-            <div className="text-[11px] text-slate-600 px-3 py-2">Sem obras</div>
-          ) : (
-            projetos.map(p => (
-              <ProjectItem key={p.id} projeto={p} deadlineProjectIds={deadlineProjectIds} completedProjectIds={completedProjectIds} />
-            ))
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
+import { useSidebarData } from '../hooks/useSidebarData';
+import { ProjectItem } from './Sidebar/ProjectItem';
+import { AdminUserGroup } from './Sidebar/AdminUserGroup';
 
 export function Sidebar() {
-  const { isArchiveMode, setArchiveMode, user, userRole, isOnline, isSyncing, lastSyncAt, hasPendingMutations, dataVersion, setUserMgmtOpen, isUserMgmtOpen } = useAppStore();
-  const [projetos, setProjetos] = useState<Projeto[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [deadlineProjectIds, setDeadlineProjectIds] = useState<number[]>([]);
-  const [completedProjectIds, setCompletedProjectIds] = useState<number[]>([]);
-  const [allUsers, setAllUsers] = useState<UserWithRole[]>([]);
-  const isAdmin = userRole === 'admin';
+  // Seletores granulares para evitar re-renders globais desnecessários
+  const isArchiveMode = useAppStore(s => s.isArchiveMode);
+  const setArchiveMode = useAppStore(s => s.setArchiveMode);
+  const user = useAppStore(s => s.user);
+  const userRole = useAppStore(s => s.userRole);
+  const isOnline = useAppStore(s => s.isOnline);
+  const isSyncing = useAppStore(s => s.isSyncing);
+  const lastSyncAt = useAppStore(s => s.lastSyncAt);
+  const hasPendingMutations = useAppStore(s => s.hasPendingMutations);
+  const isUserMgmtOpen = useAppStore(s => s.isUserMgmtOpen);
+  const setUserMgmtOpen = useAppStore(s => s.setUserMgmtOpen);
+
+  const {
+    projetos, setProjetos, loading, deadlineProjectIds, 
+    completedProjectIds, allUsers, loadProjetos, isAdmin
+  } = useSidebarData();
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   const [activeId, setActiveId] = useState<number | null>(null);
@@ -290,20 +46,15 @@ export function Sidebar() {
     setActiveId(null);
     const { active, over } = event;
     if (!over || active.id === over.id) return;
-
-    // Apenas permitimos reordenar projetos ativos no modo normal (não arquivado)
     if (isArchiveMode) return;
 
     const oldIndex = projetos.findIndex(p => p.id === active.id);
     const newIndex = projetos.findIndex(p => p.id === over.id);
 
-    // Filter to get only the sortable projects (outrosProjetos)
-    // Actually simpler: reorder the main array and map indexes
     const reordered = arrayMove(projetos, oldIndex, newIndex).map((p, i) => ({ ...p, ordem_index: i }));
     setProjetos(reordered);
 
     try {
-      const { reorderProjetos } = await import('../services/api');
       await reorderProjetos(reordered.map(p => ({ id: p.id, ordem_index: p.ordem_index || 0 })));
     } catch (e: any) {
       toast.error('Erro ao reordenar projetos: ' + e.message);
@@ -313,6 +64,7 @@ export function Sidebar() {
 
   // Password change state
   const [pwModalOpen, setPwModalOpen] = useState(false);
+  const [currentPw, setCurrentPw] = useState('');
   const [newPw, setNewPw] = useState('');
   const [confirmPw, setConfirmPw] = useState('');
   const [pwLoading, setPwLoading] = useState(false);
@@ -321,19 +73,27 @@ export function Sidebar() {
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    setPwError('');
-    setPwSuccess('');
+    setPwError(''); setPwSuccess('');
+
     if (newPw !== confirmPw) {
       setPwError('As palavras-passe não coincidem.');
       return;
     }
+
     setPwLoading(true);
     try {
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email: user?.email || '',
+        password: currentPw,
+      });
+
+      if (authError) throw new Error('A palavra-passe atual está incorreta.');
+
       const { error } = await supabase.auth.updateUser({ password: newPw });
       if (error) throw error;
+
       setPwSuccess('Palavra-passe alterada com sucesso!');
-      setNewPw('');
-      setConfirmPw('');
+      setCurrentPw(''); setNewPw(''); setConfirmPw('');
       setTimeout(() => { setPwModalOpen(false); setPwSuccess(''); }, 1500);
     } catch (err: any) {
       setPwError(err.message || 'Erro ao alterar palavra-passe.');
@@ -342,74 +102,11 @@ export function Sidebar() {
     }
   };
 
-  const loadProjetos = async (silent = false) => {
-    if (!silent) setLoading(true);
-    try {
-      // Sempre que recarregamos, refrescamos também o estado de conclusão (ignorando cache se não for silent)
-      const { deadlineIds, completedIds } = await getProjectsStatusCache(!silent);
-      setDeadlineProjectIds(deadlineIds);
-      setCompletedProjectIds(completedIds);
-
-      const data = isArchiveMode ? await fetchProjetosArquivados() : await fetchProjetos();
-      setProjetos(data);
-      // Atualizar a última data de sincronização visual
-      useAppStore.getState().setLastSyncAt(new Date().toISOString());
-    } catch (error) {
-      console.error("Erro ao carregar projetos:", error);
-    }
-    if (!silent) setLoading(false);
-  };
-
-  // Carregar cache de prazos e projetos concluídos — apenas no arranque e depois 1x/dia
-  useEffect(() => {
-    getProjectsStatusCache()
-      .then(({ deadlineIds, completedIds }) => {
-        setDeadlineProjectIds(deadlineIds);
-        setCompletedProjectIds(completedIds);
-      })
-      .catch(() => {}); // silencioso — não é crítico
-  }, []);
-
-  // Carregar lista de utilizadores para vista de admin
-  useEffect(() => {
-    if (isAdmin) {
-      fetchAllUsers().then(setAllUsers).catch(() => setAllUsers([]));
-    }
-  }, [isAdmin]);
-
-  const firstLoad = useRef(true);
-  const previousArchiveMode = useRef(isArchiveMode);
-
-  useEffect(() => {
-    // Apenas mostramos o loader se houver mudança de view (ex: Archive Mode) ou no 1º load
-    const isSilent = previousArchiveMode.current === isArchiveMode && !firstLoad.current;
-    
-    loadProjetos(isSilent);
-    
-    firstLoad.current = false;
-    previousArchiveMode.current = isArchiveMode;
-
-    // Ciclo de sincronização automática de 60 em 60 segundos
-    const syncInterval = setInterval(() => {
-      const store = useAppStore.getState();
-      // Só faz auto-refresh se estivermos com internet e sem alterações pendentes prioritárias
-      if (store.isOnline && !store.hasPendingMutations) {
-        store.setSyncing(true);
-        loadProjetos(true).finally(() => {
-           store.setSyncing(false);
-        });
-      }
-    }, 60000);
-
-    return () => clearInterval(syncInterval);
-  }, [isArchiveMode, dataVersion]); 
-
   const [width, setWidth] = useState(() => {
     const saved = localStorage.getItem('nexar-sidebar-width');
     return saved ? Math.max(288, Math.min(400, parseInt(saved, 10))) : 288;
   });
   const [isResizing, setIsResizing] = useState(false);
-  const navRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -419,10 +116,7 @@ export function Sidebar() {
       if (newWidth > 400) newWidth = 400;
       setWidth(newWidth);
     };
-
-    const handleMouseUp = () => {
-      setIsResizing(false);
-    };
+    const handleMouseUp = () => setIsResizing(false);
 
     if (isResizing) {
       document.addEventListener('mousemove', handleMouseMove);
@@ -434,12 +128,9 @@ export function Sidebar() {
       document.body.style.userSelect = '';
       localStorage.setItem('nexar-sidebar-width', width.toString());
     }
-
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
     };
   }, [isResizing, width]);
 
@@ -455,8 +146,7 @@ export function Sidebar() {
       await createProjeto(formattedRef, newProjCli.trim() === "" ? "Desconhecido" : newProjCli);
       await loadProjetos();
       setModalOpen(false);
-      setNewProjRef("");
-      setNewProjCli("");
+      setNewProjRef(""); setNewProjCli("");
       useAppStore.getState().incrementDataVersion();
       toast.success("Projeto criado com sucesso!");
     } catch (e: any) {
@@ -464,46 +154,43 @@ export function Sidebar() {
     }
   };
 
-  // Admin em modo normal: mostrar apenas os seus projetos (como um user normal)
-  const myProjetos = isAdmin && !isUserMgmtOpen
-    ? projetos.filter(p => p.user_id === user?.id)
-    : projetos;
+  // Memorizar as listas para evitar recálculo ao apenas selecionar uma obra
+  const { gs0000, outrosProjetos } = useMemo(() => {
+    const myProjetos = isAdmin && !isUserMgmtOpen
+      ? projetos.filter(p => p.user_id === user?.id)
+      : projetos;
 
-  // Separar GS0000 dos restantes projetos
-  const gs0000 = myProjetos.find(p => p.nome.startsWith('GS0000'));
-  const outrosProjetos = myProjetos
-    .filter(p => !p.nome.startsWith('GS0000'))
-    .sort((a, b) => {
-      // Regra: Obras concluídas passam sempre para baixo
-      const aDone = completedProjectIds.includes(a.id);
-      const bDone = completedProjectIds.includes(b.id);
-      if (aDone !== bDone) return aDone ? 1 : -1;
-      
-      // Dentro de cada grupo, manter a ordenação manual (index)
-      return (a.ordem_index ?? 0) - (b.ordem_index ?? 0);
-    });
+    const gs = myProjetos.find(p => p.nome.startsWith('GS0000'));
+    const others = myProjetos
+      .filter(p => !p.nome.startsWith('GS0000'))
+      .sort((a, b) => {
+        const aDone = completedProjectIds.includes(a.id);
+        const bDone = completedProjectIds.includes(b.id);
+        if (aDone !== bDone) return aDone ? 1 : -1;
+        return (a.ordem_index ?? 0) - (b.ordem_index ?? 0);
+      });
 
-  // Agrupamento por utilizador (vista admin)
-  const userGroupMap = new Map<string, { userInfo: UserWithRole; projetos: Projeto[] }>();
-  if (isAdmin && allUsers.length > 0) {
-    // Inicializar mapa com todos os utilizadores
+    return { gs0000: gs, outrosProjetos: others };
+  }, [projetos, isAdmin, isUserMgmtOpen, user?.id, completedProjectIds]);
+
+  const userGroups = useMemo(() => {
+    if (!isAdmin || allUsers.length === 0) return [];
+    
+    const map = new Map<string, { userInfo: UserWithRole; projetos: Projeto[] }>();
     for (const u of allUsers) {
-      userGroupMap.set(u.user_id, { userInfo: u, projetos: [] });
+      map.set(u.user_id, { userInfo: u, projetos: [] });
     }
-    // Distribuir projetos pelos utilizadores
     for (const p of projetos) {
-      const group = userGroupMap.get(p.user_id);
-      if (group) {
-        group.projetos.push(p);
-      }
+      const group = map.get(p.user_id);
+      if (group) group.projetos.push(p);
     }
-  }
-  // Ordenar: utilizador atual primeiro, depois por email
-  const userGroups = [...userGroupMap.values()].sort((a, b) => {
-    if (a.userInfo.user_id === user?.id) return -1;
-    if (b.userInfo.user_id === user?.id) return 1;
-    return a.userInfo.email.localeCompare(b.userInfo.email);
-  });
+
+    return [...map.values()].sort((a, b) => {
+      if (a.userInfo.user_id === user?.id) return -1;
+      if (b.userInfo.user_id === user?.id) return 1;
+      return a.userInfo.email.localeCompare(b.userInfo.email);
+    });
+  }, [isAdmin, allUsers, projetos, user?.id]);
 
   return (
     <aside 
@@ -589,7 +276,7 @@ export function Sidebar() {
       </div>
 
       {/* Lista de Projetos (Nav) */}
-      <div ref={navRef} className="flex-1 overflow-y-auto p-3 pb-20">
+      <div className="flex-1 overflow-y-auto p-3 pb-20">
         <div className="flex items-center justify-between px-3 py-2 mb-2 gap-2">
           <span className="text-xs font-medium text-slate-400 tracking-wider shrink-0 whitespace-nowrap">
             {isArchiveMode ? "PROJETOS ARQUIVADOS" : "PROJETOS ATIVOS"}
@@ -608,7 +295,7 @@ export function Sidebar() {
                 className="text-slate-500 hover:text-slate-300 p-1 active:scale-90 transition-all shrink-0" 
                 title="Atualizar"
               >
-                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21v-5h5"/></svg>
+                 <RefreshCw size={14} />
               </button>
             </div>
           )}
@@ -779,9 +466,20 @@ export function Sidebar() {
             </div>
           )}
           <div>
-            <label className="block text-sm font-medium text-slate-400 mb-1">Nova palavra-passe</label>
+            <label className="block text-sm font-medium text-slate-400 mb-1">Palavra-passe Atual</label>
             <input
               autoFocus
+              type="password"
+              required
+              value={currentPw}
+              onChange={e => setCurrentPw(e.target.value)}
+              placeholder="Digite a sua password atual"
+              className="w-full bg-slate-950 border border-slate-800 text-slate-200 rounded-lg p-2.5 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none transition-all"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-400 mb-1">Nova palavra-passe</label>
+            <input
               type="password"
               required
               minLength={6}

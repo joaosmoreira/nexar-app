@@ -24,33 +24,39 @@ export function GlobalDashboard() {
 
   const isAdmin = userRole === 'admin';
 
-  const loadMetrics = async () => {
-    setLoading(true);
+  const loadMetrics = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const [data, oldest] = await Promise.all([
         fetchDashboardMetrics(isArchiveMode),
         isArchiveMode ? Promise.resolve([]) : fetchAlertOFs(6),
       ]);
 
+      let filteredMetrics = data;
+      let filteredOldest = oldest;
+
       // Admin em modo normal: apenas os seus projetos
       if (isAdmin && !isUserMgmtOpen && user) {
-        setMetrics(data.filter((p: any) => p.user_id === user.id));
-        setOldestOfs(oldest.filter((o: any) => o.user_id === user.id));
-      } else {
-        setMetrics(data);
-        setOldestOfs(oldest);
+        filteredMetrics = data.filter((p: any) => p.user_id === user.id);
+        filteredOldest = oldest.filter((o: any) => o.user_id === user.id);
       }
+
+      setMetrics(filteredMetrics);
+      setOldestOfs(filteredOldest);
     } catch (e: any) {
       console.error(e);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => {
-    loadMetrics();
+    // Se já temos métricas e apenas o dataVersion mudou, fazemos refresh silencioso
+    const isSilent = metrics.length > 0;
+    loadMetrics(isSilent);
   }, [isArchiveMode, dataVersion, isUserMgmtOpen, userRole]);
 
-  if (loading) {
+  if (loading && metrics.length === 0) {
      return <div className="p-8 text-slate-400 font-medium animate-pulse">A carregar métricas globais...</div>;
   }
 

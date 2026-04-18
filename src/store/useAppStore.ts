@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { Session, User } from '@supabase/supabase-js';
-import { UserRole } from '../services/api';
+import { UserRole, Projeto, OrdemFabrico } from '../services/api';
 
 interface AppState {
   user: User | null;
@@ -28,6 +28,13 @@ interface AppState {
   // Password Recovery
   isPasswordRecovery: boolean;
 
+  // Cached Data for instant UI
+  projects: Projeto[];
+  ofs: OrdemFabrico[];
+  setProjects: (projects: Projeto[]) => void;
+  setOfs: (ofs: OrdemFabrico[]) => void;
+  addOfs: (newOfs: OrdemFabrico[]) => void;
+
   setUser: (user: User | null, session: Session | null) => void;
   setSelectedProject: (id: number | null) => void;
   setSelectedOf: (id: number | null) => void;
@@ -54,6 +61,8 @@ export const useAppStore = create<AppState>((set) => ({
   isSearchOpen: false,
   isUserMgmtOpen: false,
   isPasswordRecovery: false,
+  projects: [],
+  ofs: [],
 
   userRole: 'user',
 
@@ -63,6 +72,13 @@ export const useAppStore = create<AppState>((set) => ({
   hasPendingMutations: false,
   dataVersion: 0,
 
+  setProjects: (projects) => set({ projects }),
+  setOfs: (ofs) => set({ ofs }),
+  addOfs: (newOfs) => set((state) => {
+    const existingIds = new Set(state.ofs.map(o => o.id));
+    const uniqueNewOfs = newOfs.filter(o => !existingIds.has(o.id));
+    return { ofs: [...state.ofs, ...uniqueNewOfs] };
+  }),
   setUser: (user, session) => set({ 
     user, 
     session, 
@@ -84,4 +100,3 @@ export const useAppStore = create<AppState>((set) => ({
   setPendingMutations: (has) => set({ hasPendingMutations: has }),
   incrementDataVersion: () => set((state) => ({ dataVersion: state.dataVersion + 1 })),
 }));
-

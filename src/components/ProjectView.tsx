@@ -1,6 +1,9 @@
-import { useEffect, useState } from 'react';
-import { createOF, deleteProjeto, arquivarProjeto, updateProjetoNotas, fetchNextGs0000OfNumber, Projeto, OrdemFabrico } from '../services/api';
-import { supabase } from '../supabaseClient';
+import React, { useEffect, useState, useMemo } from 'react';
+import { 
+  createOF, deleteProjeto, arquivarProjeto, updateProjetoNotas, 
+  fetchNextGs0000OfNumber, Projeto, OrdemFabrico,
+  getCachedProjectDetails, fetchProjectById, fetchOfsByProjeto 
+} from '../services/api';
 import { exportToJson, exportProjectExcelWithTasks } from '../lib/exportUtils';
 import { FileDown, PlusCircle, Archive, Trash2, CalendarClock } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
@@ -9,63 +12,88 @@ import { Modal } from './Modal';
 import { toast } from 'sonner';
 
 interface OFWithProgress extends OrdemFabrico {
-  tarefas: { concluido: boolean }[];
   progress: number;
 }
 
 export function ProjectView({ projetoId }: { projetoId: number }) {
   const dataVersion = useAppStore(state => state.dataVersion);
-  const [projeto, setProjeto] = useState<Projeto | null>(null);
+  const projects = useAppStore(state => state.projects);
+  
+  // Encontrar projeto no cache global para renderização instantânea
+  const cachedProject = useMemo(() => projects.find(p => p.id === projetoId), [projects, projetoId]);
+
+  const [projeto, setProjeto] = useState<Projeto | null>(cachedProject || null);
   const [ofs, setOfs] = useState<OFWithProgress[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!cachedProject); // Apenas loading se não houver cache
   const [creating, setCreating] = useState(false);
-  const [notas, setNotas] = useState("");
-  const [initialNotas, setInitialNotas] = useState("");
+  const [notas, setNotas] = useState(cachedProject?.informacoes_gerais || "");
+  const [initialNotas, setInitialNotas] = useState(cachedProject?.informacoes_gerais || "");
+
+  const formatOfs = useMemo(() => (rawOfData: OrdemFabrico[]) => {
+    const formatted = rawOfData.map((d: any) => {
+      const total = d.tarefas?.length || 1;
+      const concluidas = d.tarefas?.filter((t: any) => t.concluido).length || 0;
+      return {
+        ...d,
+        progress: Math.round((concluidas / total) * 100)
+      };
+    });
+
+    formatted.sort((a: any, b: any) => {
+      const aDone = a.progress === 100 ? 1 : 0;
+      const bDone = b.progress === 100 ? 1 : 0;
+      if (aDone !== bDone) return aDone - bDone;
+      return new Date(a.criado_em).getTime() - new Date(b.criado_em).getTime();
+    });
+
+    return formatted;
+  }, []);
 
   // Fetch Project & OFs with Tasks
   const loadData = async () => {
-    setLoading(true);
+    // 1. Carregamento Otimista (Cache de Disco)
+    if (!projeto) {
+      const cached = await getCachedProjectDetails(projetoId);
+      if (cached.projeto) {
+        setProjeto(cached.projeto);
+        setNotas(cached.projeto.informacoes_gerais || "");
+        setInitialNotas(cached.projeto.informacoes_gerais || "");
+        setOfs(formatOfs(cached.ofs));
+        setLoading(false);
+      }
+    }
     
-    // 1. Get Project info
-    const { data: projData } = await supabase.from('projectos').select('*').eq('id', projetoId).single();
-    if (projData) {
-      setProjeto(projData);
-      setNotas(projData.informacoes_gerais || "");
-      setInitialNotas(projData.informacoes_gerais || "");
+    try {
+      // 2. Busca Fresh (Paralelo)
+      const [projRes, ofsRes] = await Promise.all([
+        fetchProjectById(projetoId),
+        fetchOfsByProjeto(projetoId)
+      ]);
+
+      if (projRes) {
+        setProjeto(projRes);
+        setNotas(projRes.informacoes_gerais || "");
+        setInitialNotas(projRes.informacoes_gerais || "");
+      }
+
+      if (ofsRes) {
+        setOfs(formatOfs(ofsRes));
+      }
+    } catch (e: any) {
+      console.error("Erro ao carregar projeto:", e);
+    } finally {
+      setLoading(false);
     }
-
-    // 2. Get OFs and their Tasks to calc progress
-    const { data: ofData } = await supabase
-      .from('ordens_fabrico')
-      .select('*, tarefas(*)')
-      .eq('projeto_id', projetoId)
-      .order('criado_em', { ascending: false });
-
-    if (ofData) {
-      const formatted = ofData.map((d: any) => {
-        const total = d.tarefas?.length || 1;
-        const concluidas = d.tarefas?.filter((t: any) => t.concluido).length || 0;
-        return {
-          ...d,
-          progress: Math.round((concluidas / total) * 100)
-        };
-      });
-
-      // Ordenar: Abertas no topo (progress < 100), Concluídas no fim (progress === 100)
-      formatted.sort((a: any, b: any) => {
-         const aDone = a.progress === 100 ? 1 : 0;
-         const bDone = b.progress === 100 ? 1 : 0;
-         if (aDone !== bDone) return aDone - bDone;
-         // Both open/closed. Order oldest first (a.criado_em < b.criado_em)
-         return new Date(a.criado_em).getTime() - new Date(b.criado_em).getTime();
-      });
-
-      setOfs(formatted);
-    }
-    setLoading(false);
   };
 
+  // Resetar estado quando o projeto muda
   useEffect(() => {
+    if (cachedProject) {
+      setProjeto(cachedProject);
+      setNotas(cachedProject.informacoes_gerais || "");
+      setInitialNotas(cachedProject.informacoes_gerais || "");
+      setLoading(false);
+    }
     loadData();
   }, [projetoId, dataVersion]);
 

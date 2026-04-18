@@ -60,6 +60,18 @@ export async function fetchProjetos(): Promise<Projeto[]> {
   }
 }
 
+export async function fetchProjectById(id: number): Promise<Projeto | null> {
+  if (isOnline()) {
+    const { data, error } = await supabase.from('projectos').select('*').eq('id', id).single();
+    if (error) throw error;
+    return data as Projeto;
+  } else {
+    const cache = await readCache();
+    const all = [...(cache.projetos || []), ...(cache.projetoArquivados || [])];
+    return all.find(p => p.id === id) || null;
+  }
+}
+
 export async function fetchProjetosArquivados(): Promise<Projeto[]> {
   if (isOnline()) {
     const { data, error } = await supabase
@@ -95,6 +107,15 @@ export async function fetchOfsByProjeto(projetoId: number): Promise<OrdemFabrico
     const cache = await readCache();
     return (cache.ofsByProjeto || {})[projetoId] || [];
   }
+}
+
+/** Retorna dados do cache imediatamente para o ProjectView usar como preview */
+export async function getCachedProjectDetails(projetoId: number): Promise<{ projeto: Projeto | null, ofs: OrdemFabrico[] }> {
+  const cache = await readCache();
+  const allProjs = [...(cache.projetos || []), ...(cache.projetoArquivados || [])];
+  const projeto = allProjs.find(p => p.id === projetoId) || null;
+  const ofs = (cache.ofsByProjeto || {})[projetoId] || [];
+  return { projeto, ofs };
 }
 
 export async function fetchTarefasByOf(ofId: number): Promise<Tarefa[]> {
