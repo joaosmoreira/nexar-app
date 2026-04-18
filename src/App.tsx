@@ -1,12 +1,8 @@
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
 import "./App.css";
 import { Sidebar } from "./components/Sidebar";
-import { ProjectView } from "./components/ProjectView";
-import { OfView } from "./components/OfView";
-import { GlobalDashboard } from "./components/GlobalDashboard";
 import { GlobalSearchModal } from "./components/GlobalSearchModal";
-import { UserManagement } from "./components/UserManagement";
 import { useAppStore } from "./store/useAppStore";
 import {
   runAutoArchive,
@@ -26,6 +22,23 @@ import { flushPendingMutations } from "./services/offlineCache";
 import { Auth } from "./components/Auth";
 import { PasswordReset } from "./components/PasswordReset";
 import { supabase } from "./supabaseClient";
+
+// Carregamento Preguiçoso (Code-Splitting)
+const GlobalDashboard = lazy(() => import("./components/GlobalDashboard").then(m => ({ default: m.GlobalDashboard })));
+const ProjectView = lazy(() => import("./components/ProjectView").then(m => ({ default: m.ProjectView })));
+const OfView = lazy(() => import("./components/OfView").then(m => ({ default: m.OfView })));
+const UserManagement = lazy(() => import("./components/UserManagement").then(m => ({ default: m.UserManagement })));
+
+function LoadingScreen() {
+  return (
+    <div className="flex-1 flex items-center justify-center bg-slate-900">
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-8 h-8 border-2 border-sky-500/30 border-t-sky-500 rounded-full animate-spin"></div>
+        <span className="text-xs text-slate-500 font-medium tracking-widest uppercase">A carregar vista...</span>
+      </div>
+    </div>
+  );
+}
 
 function App() {
   const {
@@ -202,16 +215,18 @@ function App() {
       <main className="flex-1 bg-slate-900 border-l border-t border-slate-800 shadow-2xl overflow-hidden relative">
         <GlobalSearchModal />
 
-        {/* Dynamic routing based on Zustand state */}
-        {selectedOfId && <OfView ofId={selectedOfId} />}
+        <Suspense fallback={<LoadingScreen />}>
+          {/* Dynamic routing based on Zustand state */}
+          {selectedOfId && <OfView ofId={selectedOfId} />}
 
-        {!selectedOfId && selectedProjectId && (
-          <ProjectView projetoId={selectedProjectId} />
-        )}
+          {!selectedOfId && selectedProjectId && (
+            <ProjectView projetoId={selectedProjectId} />
+          )}
 
-        {!selectedOfId && !selectedProjectId && isUserMgmtOpen && <UserManagement />}
+          {!selectedOfId && !selectedProjectId && isUserMgmtOpen && <UserManagement />}
 
-        {!selectedOfId && !selectedProjectId && !isUserMgmtOpen && <GlobalDashboard />}
+          {!selectedOfId && !selectedProjectId && !isUserMgmtOpen && <GlobalDashboard />}
+        </Suspense>
       </main>
     </div>
   );
