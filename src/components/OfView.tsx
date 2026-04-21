@@ -20,6 +20,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useOfData } from '../hooks/useOfData';
+import { NotesPanel } from './NotesPanel';
 
 // ─── Sortable Task Row ─────────────────────────────────────────────────────────
 
@@ -123,7 +124,7 @@ export function OfView({ ofId }: { ofId: number }) {
   const {
     ofData, setOfData, tarefas, setTarefas, loading, 
     projectName, notas, setNotas, 
-    initialNotas, setInitialNotas, prazoLimite, setPrazoLimite, loadData 
+    setInitialNotas, prazoLimite, setPrazoLimite, loadData 
   } = useOfData(ofId);
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -132,10 +133,13 @@ export function OfView({ ofId }: { ofId: number }) {
   const [deleteInputName, setDeleteInputName] = useState('');
   const [editingOfName, setEditingOfName] = useState(false);
   const [editOfValue, setEditOfValue] = useState('');
+  const [editingNumeroOf, setEditingNumeroOf] = useState(false);
+  const [editNumeroOfValue, setEditNumeroOfValue] = useState('');
   const [activeId, setActiveId] = useState<number | null>(null);
   const [editingPrazo, setEditingPrazo] = useState(false);
   const [prazoEditValue, setPrazoEditValue] = useState('');
   const ofNameInputRef = useRef<HTMLInputElement>(null);
+  const ofNumeroInputRef = useRef<HTMLInputElement>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
@@ -173,14 +177,33 @@ export function OfView({ ofId }: { ofId: number }) {
     setEditingOfName(false);
   };
 
-  const handleBlurNotas = async () => {
-    if (notas !== initialNotas && ofData) {
+  const startEditNumeroOf = () => {
+    setEditNumeroOfValue(ofData?.numero_of || '');
+    setEditingNumeroOf(true);
+    setTimeout(() => ofNumeroInputRef.current?.focus(), 0);
+  };
+
+  const submitNumeroOf = async () => {
+    const trimmed = editNumeroOfValue.trim();
+    if (trimmed && trimmed !== ofData?.numero_of && ofData) {
+      setOfData(prev => prev ? { ...prev, numero_of: trimmed } : prev);
       try {
-        await updateOrdemFabrico(ofId, { notas });
-        setInitialNotas(notas);
+        await updateOrdemFabrico(ofData.id, { numero_of: trimmed });
+        useAppStore.getState().incrementDataVersion();
+        toast.success('Número de OF atualizado.');
       } catch (e: any) {
-        toast.error("Erro ao guardar notas: " + e.message);
+        toast.error('Erro ao atualizar número: ' + e.message);
+        loadData();
       }
+    }
+    setEditingNumeroOf(false);
+  };
+
+
+  const handleSaveNotas = async () => {
+    if (ofData) {
+      await updateOrdemFabrico(ofId, { notas });
+      setInitialNotas(notas);
     }
   };
 
@@ -269,7 +292,9 @@ export function OfView({ ofId }: { ofId: number }) {
   const activeTarefa = activeId ? tarefas.find(t => t.id === activeId) : null;
 
   return (
-    <div className="p-8 h-full overflow-auto relative">
+    <div className="flex h-full overflow-hidden">
+      {/* ── Main scrollable area ── */}
+      <div className="flex-1 min-w-0 p-8 pb-32 overflow-auto relative">
       <Modal isOpen={deleteModalOpen} title="Apagar Ordem de Fabrico" onClose={() => setDeleteModalOpen(false)}>
         <form onSubmit={confirmApagar} className="flex flex-col gap-4">
           <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-lg text-sm"><span className="font-bold">Segurança:</span> De certeza que deseja apagar a OF?</div>
@@ -288,9 +313,33 @@ export function OfView({ ofId }: { ofId: number }) {
       </Modal>
 
       <div className="mb-8">
-        <div className="flex items-center text-xs font-medium tracking-widest uppercase mb-2">
+        <div className="flex items-center text-xs font-medium tracking-widest uppercase mb-2 group/breadcrumb">
           <button onClick={() => useAppStore.getState().setSelectedOf(null)} className="text-slate-400 hover:text-sky-400 transition-colors cursor-pointer outline-none">{projectName || 'PROJETO'}</button>
-          <span className="text-slate-700 mx-2">/</span><span className="text-sky-400">OF {ofData.numero_of}</span>
+          <span className="text-slate-700 mx-2">/</span>
+          {editingNumeroOf ? (
+            <span className="flex items-center gap-1">
+              <input
+                ref={ofNumeroInputRef}
+                type="text"
+                value={editNumeroOfValue}
+                onChange={e => setEditNumeroOfValue(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') submitNumeroOf(); if (e.key === 'Escape') setEditingNumeroOf(false); }}
+                onBlur={submitNumeroOf}
+                className="bg-slate-800 border border-sky-500/60 text-sky-400 rounded px-2 py-0.5 text-xs font-bold uppercase tracking-widest w-32 focus:outline-none focus:ring-1 focus:ring-sky-500"
+              />
+            </span>
+          ) : (
+            <span className="flex items-center gap-1.5">
+              <span className="text-sky-400">OF {ofData.numero_of}</span>
+              <button
+                onClick={startEditNumeroOf}
+                className="opacity-0 group-hover/breadcrumb:opacity-100 p-0.5 rounded text-slate-600 hover:text-sky-400 hover:bg-sky-500/10 active:scale-90 transition-all"
+                title="Editar número de OF"
+              >
+                <Pencil size={11} />
+              </button>
+            </span>
+          )}
         </div>
         <div className="flex justify-between items-start">
           <div className="flex items-center gap-3 group/title flex-1 mr-4"><Settings2 className="text-sky-500 shrink-0" />
@@ -323,9 +372,7 @@ export function OfView({ ofId }: { ofId: number }) {
         </div>
       </div>
 
-      <div className="mb-8"><label className="block text-sm font-medium text-slate-400 mb-2">Notas / Detalhes de Produção</label>
-        <textarea value={notas} onChange={e => setNotas(e.target.value)} onBlur={handleBlurNotas} placeholder="Adicione referências..." className="w-full bg-slate-800/30 border border-slate-700 text-slate-200 rounded-xl p-4 min-h-[100px] focus:outline-none focus:ring-1 focus:ring-sky-500 transition-all resize-y" />
-      </div>
+
 
       <div className="space-y-3 max-w-4xl">
         <div className="flex items-center justify-between mb-4 px-1"><h3 className="text-lg font-medium text-slate-200">Checklist de Tarefas</h3><span className="text-xs text-slate-500 flex items-center gap-1.5"><GripVertical size={12} /> Arrasta para reordenar</span></div>
@@ -339,5 +386,17 @@ export function OfView({ ofId }: { ofId: number }) {
         <button onClick={() => setModalOpen(true)} className="mt-4 w-full flex items-center justify-center gap-2 p-3 rounded-xl border border-dashed border-slate-700 text-slate-400 hover:text-sky-400 hover:border-sky-500/50 active:scale-[0.98] transition-all"><Plus size={18} /><span>Adicionar Tarefa</span></button>
       </div>
     </div>
-  );
+
+    {/* ── Sidebar: Notas ── */}
+    <div className="w-80 shrink-0 border-l border-slate-800 bg-slate-900/40 flex flex-col h-full overflow-hidden">
+      <NotesPanel
+        value={notas}
+        onChange={setNotas}
+        onSave={handleSaveNotas}
+        placeholder="Referências, materiais, observações..."
+        label="Notas de Produção"
+      />
+    </div>
+  </div>
+);
 }

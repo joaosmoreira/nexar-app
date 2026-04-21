@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  createOF, deleteProjeto, arquivarProjeto, updateProjetoNotas, 
+  createOF, deleteProjeto, arquivarProjeto, 
   fetchNextGs0000OfNumber
 } from '../services/api';
 import { exportToJson, exportProjectExcelWithTasks } from '../lib/exportUtils';
-import { FileDown, PlusCircle, Archive, Trash2, CalendarClock } from 'lucide-react';
+import { FileDown, PlusCircle, Archive, Trash2, CalendarClock, StickyNote } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { cn } from '../lib/utils';
 import { Modal } from './Modal';
@@ -13,8 +13,7 @@ import { useProjectData } from '../hooks/useProjectData';
 
 export function ProjectView({ projetoId }: { projetoId: number }) {
   const { 
-    projeto, ofs, loading, notas, setNotas, 
-    initialNotas, setInitialNotas, loadData 
+    projeto, ofs, loading, loadData 
   } = useProjectData(projetoId);
 
   const [creating, setCreating] = useState(false);
@@ -123,16 +122,6 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
     }
   };
 
-  const handleBlurNotas = async () => {
-    if (notas !== initialNotas && projeto) {
-      try {
-        await updateProjetoNotas(projeto.id, notas);
-        setInitialNotas(notas);
-      } catch (e: any) {
-        toast.error("Erro ao guardar notas: " + e.message);
-      }
-    }
-  };
 
   const formatPrazo = (prazo: string | null | undefined) => {
     if (!prazo) return null;
@@ -148,8 +137,11 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
   if (loading) return <div className="p-8 text-slate-400">A carregar projeto...</div>;
   if (!projeto) return <div className="p-8 text-slate-400">Projeto não encontrado.</div>;
 
+
   return (
-    <div className="p-8 pb-32 h-full overflow-auto relative">
+    <div className="flex h-full overflow-hidden">
+      {/* ── Main scrollable area ── */}
+      <div className="flex-1 min-w-0 p-8 pb-32 overflow-auto relative">
       <Modal isOpen={archiveModalOpen} title="Arquivar Projeto" onClose={() => setArchiveModalOpen(false)}>
         <form onSubmit={confirmArquivar} className="flex flex-col gap-4">
           <div className="bg-amber-500/10 border border-amber-500/20 text-amber-500 p-4 rounded-lg text-sm">
@@ -233,10 +225,7 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
         </div>
       </div>
 
-      <div className="mb-8">
-        <label className="block text-sm font-medium text-slate-400 mb-2">Informações Gerais</label>
-        <textarea value={notas} onChange={e => setNotas(e.target.value)} onBlur={handleBlurNotas} disabled={projeto.arquivado} placeholder="Insira aqui as notas..." className="w-full bg-slate-800/30 border border-slate-700 text-slate-200 rounded-xl p-4 min-h-[120px] focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 transition-all resize-y disabled:opacity-50 disabled:cursor-not-allowed" />
-      </div>
+
 
       <div className="bg-slate-800/30 border border-slate-700 rounded-2xl overflow-hidden">
         <div className="p-5 border-b border-slate-700/50 flex justify-between items-center bg-slate-800/50">
@@ -246,25 +235,55 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
         {ofs.length === 0 ? <div className="p-12 text-center text-slate-500">Nenhuma Ordem de Fabrico registada.</div> : (
           <table className="w-full text-left text-sm text-slate-300">
             <thead className="text-xs uppercase bg-slate-900/50 text-slate-400 font-medium tracking-wider">
-              <tr><th className="px-6 py-4">Nº OF</th><th className="px-6 py-4">Nome</th><th className="px-6 py-4">Data</th><th className="px-6 py-4">Prazo</th><th className="px-6 py-4">Progresso</th><th className="px-6 py-4 text-right">Ação</th></tr>
+              <tr><th className="px-4 py-3">Nº OF</th><th className="px-4 py-3">Nome</th><th className="px-4 py-3">Prazo</th><th className="px-4 py-3">Progresso</th><th className="px-4 py-3 text-right">Ação</th></tr>
             </thead>
             <tbody className="divide-y divide-slate-800">
               {ofs.map((of) => {
                 const prazo = formatPrazo(of.prazo_limite);
                 return (
                   <tr key={of.id} onClick={() => useAppStore.getState().setSelectedOf(of.id)} className="hover:bg-slate-800/80 transition-colors cursor-pointer group">
-                    <td className="px-6 py-4 font-mono text-sky-400">{of.numero_of}</td>
-                    <td className="px-6 py-4 font-medium text-slate-200">{of.nome_of}</td>
-                    <td className="px-6 py-4 text-slate-400">{new Date(of.criado_em).toLocaleDateString()}</td>
-                    <td className="px-6 py-4">{prazo ? <div className={cn("flex items-center gap-1.5", prazo.color)}><CalendarClock size={13} /><span>{prazo.label}</span></div> : "—"}</td>
-                    <td className="px-6 py-4 w-64"><div className="flex items-center gap-3"><div className="w-full bg-slate-700 rounded-full h-1.5 flex-1 overflow-hidden"><div className={cn("h-1.5 rounded-full transition-all duration-500", of.progress === 100 ? "bg-emerald-400" : "bg-sky-500")} style={{ width: `${of.progress}%` }}></div></div><span className="text-xs font-medium text-slate-400 w-8">{of.progress}%</span></div></td>
-                    <td className="px-6 py-4 text-right"><button className="text-sky-500 group-hover:text-sky-300 font-medium">Abrir</button></td>
+                    <td className="px-4 py-3 font-mono text-sky-400">{of.numero_of}</td>
+                    <td className="px-4 py-3 font-medium text-slate-200">{of.nome_of}</td>
+                    <td className="px-4 py-3">{prazo ? <div className={cn("flex items-center gap-1.5", prazo.color)}><CalendarClock size={13} /><span>{prazo.label}</span></div> : "—"}</td>
+                    <td className="px-4 py-3 w-56"><div className="flex items-center gap-3"><div className="w-full bg-slate-700 rounded-full h-1.5 flex-1 overflow-hidden"><div className={cn("h-1.5 rounded-full transition-all duration-500", of.progress === 100 ? "bg-emerald-400" : "bg-sky-500")} style={{ width: `${of.progress}%` }}></div></div><span className="text-xs font-medium text-slate-400 w-8">{of.progress}%</span></div></td>
+                    <td className="px-4 py-3 text-right"><button className="text-sky-500 group-hover:text-sky-300 font-medium">Abrir</button></td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
         )}
+      </div>
+
+      </div>
+
+      {/* ── Sidebar: Notas das OFs ── */}
+      <div className="w-80 shrink-0 border-l border-slate-800 bg-slate-900/40 flex flex-col h-full overflow-hidden">
+        <div className="flex items-center gap-2 px-5 py-4 border-b border-slate-800 shrink-0 bg-slate-900/60">
+          <StickyNote size={15} className="text-amber-400" />
+          <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-300">Notas das OFs</h3>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          {ofs.filter(o => o.notas).length === 0 ? (
+            <div className="p-6 text-center text-sm text-slate-500">Sem notas registadas nas Ordens de Fabrico.</div>
+          ) : (
+            <div className="flex flex-col divide-y divide-slate-800/60">
+              {ofs.filter(o => o.notas).map(o => (
+                <div 
+                  key={o.id} 
+                  className="p-5 hover:bg-slate-800/30 transition-colors cursor-pointer group"
+                  onClick={() => useAppStore.getState().setSelectedOf(o.id)}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-mono text-[11px] text-sky-400 font-semibold bg-sky-500/10 px-1.5 py-0.5 rounded">{o.numero_of}</span>
+                    <span className="text-[11px] text-slate-400 truncate ml-2 text-right">{o.nome_of}</span>
+                  </div>
+                  <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap group-hover:text-slate-200 transition-colors">{o.notas}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

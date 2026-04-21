@@ -1,55 +1,53 @@
-# Relatório de Auditoria e Otimização — Nexar HUB
+# Relatório de Auditoria e Evolução — Nexar HUB
 
-Este relatório consolida a verificação global de todo o código da aplicação **work-manager**, focando-se na identificação de elementos não utilizados (código morto) e propondo melhorias arquiteturais para o futuro.
+Este relatório documenta o estado atual da aplicação **work-manager** após a implementação das melhorias estruturais sugeridas na auditoria anterior.
 
-## 1. Higiene do Código (Elementos Não Utilizados)
+## 1. Estado da Implementação (Melhorias Concluídas)
 
-A base de código atual (React, TypeScript e Tauri) encontra-se num excelente estado de limpeza. Após uma auditoria rigorosa do compilador (`tsc --noUnusedLocals --noUnusedParameters`), não foram detetadas variáveis, parâmetros ou importações órfãs nos componentes principais.
+A base de código passou por uma refatoração significativa, resultando numa arquitetura mais modular e resiliente:
 
-No entanto, a um nível macro (ficheiros e pastas), foram identificados os seguintes elementos que não fazem parte do *runtime* da aplicação:
+### 1.1. Organização de Ficheiros
+*   **Scripts de Desenvolvimento:** Todos os utilitários de *seeding* e manutenção foram movidos para `docs/dev-scripts/`, limpando a raiz e a pasta de código-fonte.
+*   **Esquema de Base de Dados:** O ficheiro `supabase-schema.sql` foi devidamente movido para `docs/`, separando a definição da infraestrutura do código da aplicação.
 
-### 1.1. Pasta `scripts/` (Obsoleta/Desenvolvimento)
-Os seguintes ficheiros na pasta `scripts/` não são consumidos pela aplicação em execução e servem apenas propósitos de *seeding* ou manutenção isolada da base de dados:
-*   `seed.ts`
-*   `backdate.ts`
-*   `randomizeDates.ts`
-*   `install-mac.command`
+### 1.2. Desmembramento do Monólito `api.ts`
+O antigo ficheiro `api.ts` foi decomposto com sucesso:
+*   **Serviços de Domínio:** Foram criados serviços específicos (`projectService.ts`, `ofService.ts`, `taskService.ts`, `userService.ts`, `metricsService.ts`) que lidam exclusivamente com as chamadas remotas ao Supabase.
+*   **Fachada Unificada:** O ficheiro `src/services/api.ts` funciona agora como uma **Unified Facade**, orquestrando a lógica de sincronização Online/Offline. Isto simplifica o consumo de dados pelos componentes, que não precisam de se preocupar com o estado da rede.
 
-**Ação Sugerida:** Mover estes ficheiros para uma pasta `docs/dev-scripts/` ou removê-los do repositório principal se já não forem necessários, para evitar confusão sobre a sua função na arquitetura.
+### 1.3. Otimização de Performance (Code-Splitting)
+*   **Lazy Loading:** O `App.tsx` utiliza agora `React.lazy()` e `Suspense` para carregar as vistas principais (`GlobalDashboard`, `ProjectView`, `OfView`, `UserManagement`).
+*   **Impacto:** Redução significativa do tempo de carregamento inicial e melhor gestão de memória, carregando apenas o código necessário para a vista ativa.
 
-### 1.2. Supabase SQL Schema (`src/supabase-schema.sql`)
-O ficheiro de esquema SQL reside dentro da pasta `src/`, que tipicamente deve conter apenas o código do *frontend*.
-**Ação Sugerida:** Movê-lo para a raiz do projeto (ex: `/db/schema.sql`) ou para uma pasta `/docs/`, separando claramente o código da interface das definições da infraestrutura de base de dados.
+### 1.4. Refatoração de Componentes
+*   As vistas complexas (`OfView` e `ProjectView`) foram simplificadas através do uso de *Custom Hooks* (como `useOfData`) e sub-componentes especializados (como `SortableTask`), reduzindo a densidade de lógica no JSX.
 
 ---
 
-## 2. Sugestões de Melhoria e Arquitetura (Próximos Passos)
+## 2. Novas Recomendações (Próximos Passos)
 
-À medida que o projeto ganha dimensão, algumas partes do código começam a revelar sinais de complexidade (conhecido como *code smell* de ficheiros monolíticos). Sugerem-se as seguintes refatorações para garantir a escalabilidade do sistema:
+Com a arquitetura de base consolidada, o foco deve agora virar-se para a robustez e manutenibilidade a longo prazo:
 
-### 2.1. Divisão do Monólito `api.ts`
-O ficheiro `src/services/api.ts` atingiu mais de 800 linhas e agrega múltiplas responsabilidades (Projetos, Tarefas, Ordens de Fabrico, Gestão de Utilizadores, Auto-Archive e pesquisas complexas).
-*   **Melhoria:** Dividir este ficheiro em serviços específicos por domínio.
-    *   `projectService.ts` (operações CRUD de obras)
-    *   `ofService.ts` (Ordens de Fabrico e Tarefas)
-    *   `userService.ts` (Roles e gestão de equipa)
+### 2.1. Implementação de Testes Automatizados
+Atualmente, o projeto não possui uma suite de testes. À medida que a lógica de sincronização offline se torna mais complexa, testes automatizados são cruciais.
+*   **Ação:** Instalar **Vitest** e **React Testing Library**.
+*   **Foco Inicial:** Testar os serviços de lógica offline (`api.ts` e `offlineCache.ts`) para garantir que as mutações são corretamente enfileiradas e aplicadas após o *flush*.
 
-### 2.2. Decomposição de Views (`OfView` e `ProjectView`)
-Os ficheiros `OfView.tsx` e `ProjectView.tsx` ultrapassam as 500 linhas, contendo não só o desenho da UI (JSX), mas também muita lógica de negócio (drag-and-drop, exportação Excel/JSON, gestão de modais, formatação de prazos).
-*   **Melhoria:** Extrair a lógica pesada para *Custom Hooks* (ex: `useProjectViewData()`, `useOfDragAndDrop()`). Separar as secções da UI em sub-componentes (ex: `<OfHeader />`, `<TaskList />`, `<ProjectMetrics />`), à semelhança do que foi feito com sucesso na `Sidebar`.
+### 2.2. Reforço da Tipagem no Cache Offline
+Observou-se o uso de `any` em várias funções de manipulação de cache no ficheiro `api.ts`.
+*   **Ação:** Definir interfaces rigorosas para o estado do cache e utilizar utilitários de TypeScript para garantir que as atualizações manuais do cache (durante o modo offline) mantêm a integridade dos dados.
 
-### 2.3. Code-Splitting das Rotas
-Atualmente, o ficheiro `App.tsx` importa estaticamente todos os "ecrãs" da aplicação (`GlobalDashboard`, `ProjectView`, `OfView`, `UserManagement`), o que obriga o navegador a carregar o código inteiro (bundle de ~1.4MB) no arranque.
-*   **Melhoria:** Utilizar `React.lazy()` e `<Suspense>` para carregar estes componentes maiores apenas quando o utilizador navega para eles. Isto reduzirá o tempo inicial de "Tauri splash screen" para milissegundos.
+### 2.3. Documentação Técnica (JSDoc)
+Embora o código seja limpo e as variáveis bem nomeadas, a complexidade da lógica de orquestração online/offline beneficiaria de documentação *inline*.
+*   **Ação:** Adicionar blocos JSDoc às funções principais dos serviços, descrevendo parâmetros, retornos e comportamentos específicos em caso de falha de rede.
 
-### 2.4. Resiliência do Cache Offline
-O ficheiro `offlineCache.ts` guarda todo o estado (projetos, OFs e tarefas) no disco (`nexar-cache.json`). Se a base de dados crescer muito, carregar o JSON inteiro para a memória em cada arranque pode tornar-se lento em máquinas menos potentes.
-*   **Melhoria a longo prazo:** Migrar de uma solução baseada num único ficheiro de texto (JSON) para uma base de dados local real e estruturada (ex: `IndexedDB` via *Dexie.js* ou SQLite em Rust do lado do Tauri), que permite ler partes específicas dos dados sem carregar tudo para a RAM.
+### 2.4. Monitorização de Escalabilidade do Cache
+O sistema atual utiliza um ficheiro JSON único (`nexar-cache.json`) para o modo offline.
+*   **Observação:** À medida que o volume de dados (especialmente notas e histórico de tarefas) cresce, a operação de leitura/escrita do JSON inteiro pode tornar-se um gargalo.
+*   **Ação Futura:** Avaliar a migração para **SQLite** (via plugin Tauri) caso o cache ultrapasse os 5-10MB, permitindo queries parciais e maior performance.
 
 ---
 
 ## 3. Conclusão
 
-A aplicação **work-manager** encontra-se na sua fase mais polida, estável e responsiva. O foco em funcionalidades "instantâneas" (através do Zustand) proporcionou uma excelente experiência de utilizador.
-
-As recomendações listadas neste relatório não são urgentes nem afetam a experiência atual; são, sim, um guia de "boas práticas" de engenharia de software para garantir que o projeto se mantém rápido, fácil de testar e fácil de gerir à medida que a fábrica escala e novas funcionalidades são encomendadas.
+A aplicação atingiu um nível de maturidade técnica elevado (**v1.1.0**). As dívidas técnicas críticas identificadas anteriormente foram resolvidas. O sistema é agora modular, performante e preparado para novos módulos de negócio. As recomendações atuais visam transformar o projeto num produto de "classe empresarial", onde a fiabilidade dos dados é garantida por testes e tipagem rigorosa.
