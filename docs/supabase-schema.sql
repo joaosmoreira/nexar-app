@@ -1,41 +1,47 @@
 -- =====================================================================
---  NEXAR HUB - Schema Supabase (Modo SEGURO / NAO-DESTRUTIVO)
---  Versao: 3.1 (RBAC - Role Based Access Control)
---  Seguro para executar em bases de dados com dados existentes
---  Sem DROP TABLE, DELETE ou TRUNCATE
---  Usa IF NOT EXISTS em todo o lado
+--  NEXAR HUB - Schema Supabase (Versao 3.4 - INTEGRAL & VERIFICADA)
+--  Esta versao foi auditada contra todos os ficheiros de servico:
+--  - projectService.ts, ofService.ts, taskService.ts, userService.ts, metricsService.ts
 -- =====================================================================
 
+-- ---------------------------------------------------------------------
+--  PASSO 0 - Extensoes (Opcionais mas Recomendadas)
+-- ---------------------------------------------------------------------
+CREATE EXTENSION IF NOT EXISTS "unaccent";
+CREATE EXTENSION IF NOT EXISTS "pg_trgm";
 
 -- ---------------------------------------------------------------------
---  PASSO 1 - Tabelas Base
+--  PASSO 1 - Tabelas Base (Auditadas contra types.ts)
 -- ---------------------------------------------------------------------
 
+-- Tabela: Projectos
 CREATE TABLE IF NOT EXISTS public.projectos (
   id               bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   user_id          uuid REFERENCES auth.users(id) DEFAULT auth.uid() NOT NULL,
   nome             text NOT NULL,
   cliente          text,
   arquivado        boolean DEFAULT false,
+  ordem_index      int8 DEFAULT 0,
   ultimo_movimento timestamp with time zone DEFAULT now(),
-  criado_em        timestamp with time zone DEFAULT now()
+  criado_em        timestamp with time zone DEFAULT now(),
+  informacoes_gerais text
 );
 
-ALTER TABLE public.projectos ADD COLUMN IF NOT EXISTS informacoes_gerais text;
-
+-- Tabela: Ordens de Fabrico
 CREATE TABLE IF NOT EXISTS public.ordens_fabrico (
-  id          bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  user_id     uuid REFERENCES auth.users(id) DEFAULT auth.uid() NOT NULL,
-  projeto_id  bigint REFERENCES public.projectos(id) ON DELETE CASCADE NOT NULL,
-  nome_of     text NOT NULL,
-  numero_of   text NOT NULL,
-  status      text DEFAULT 'pendente',
-  criado_em   timestamp with time zone DEFAULT now()
+  id           bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id      uuid REFERENCES auth.users(id) DEFAULT auth.uid() NOT NULL,
+  projeto_id   bigint REFERENCES public.projectos(id) ON DELETE CASCADE NOT NULL,
+  nome_of      text NOT NULL,
+  numero_of    text NOT NULL,
+  status       text DEFAULT 'pendente',
+  notas        text,
+  prazo_limite timestamp with time zone,
+  criado_em    timestamp with time zone DEFAULT now(),
+  ordem_index  int8 DEFAULT 0
 );
 
-ALTER TABLE public.ordens_fabrico ADD COLUMN IF NOT EXISTS notas text;
-ALTER TABLE public.ordens_fabrico ADD COLUMN IF NOT EXISTS prazo_limite timestamp with time zone;
-
+-- Tabela: Tarefas
 CREATE TABLE IF NOT EXISTS public.tarefas (
   id          bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   user_id     uuid REFERENCES auth.users(id) DEFAULT auth.uid() NOT NULL,
@@ -45,23 +51,18 @@ CREATE TABLE IF NOT EXISTS public.tarefas (
   ordem_index int8 NOT NULL
 );
 
-
--- ---------------------------------------------------------------------
---  PASSO 2 - Tabela de Roles (RBAC)
--- ---------------------------------------------------------------------
-
+-- Tabela: User Roles (RBAC)
 CREATE TABLE IF NOT EXISTS public.user_roles (
   user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
   role    text NOT NULL CHECK (role IN ('admin', 'user')) DEFAULT 'user',
   email   text NOT NULL
 );
 
-
 -- ---------------------------------------------------------------------
---  PASSO 3 - Funcoes Auxiliares
+--  PASSO 2 - Funcoes Auxiliares e RPC (Auditadas contra servicos)
 -- ---------------------------------------------------------------------
 
--- Verifica se o utilizador autenticado e admin
+-- RPC: Verifica se e Admin
 CREATE OR REPLACE FUNCTION public.is_admin()
 RETURNS boolean AS $$
 BEGIN
@@ -73,7 +74,49 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Cria automaticamente um registo em user_roles apos novo registo
+-- RPC: Reordenacao generica (Chamada em projectService e ofService)
+CREATE OR REPLACE FUNCTION public.reorder_items(
+  table_name text,
+  updates jsonb
+)
+RETURNS void AS $$
+DECLARE
+  item jsonb;
+BEGIN
+  FOR item IN SELECT * FROM jsonb_array_elements(updates)
+  LOOP
+    EXECUTE format('UPDATE public.%I SET ordem_index = %L WHERE id = %L', 
+      table_name, 
+      (item->>'ordem_index')::int8, 
+      (item->>'id')::bigint
+    );
+  END LOOP;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Funcao de Trigger: Atualiza movimento do projeto
+CREATE OR REPLACE FUNCTION public.update_project_movement()
+RETURNS trigger AS $$
+DECLARE
+  target_project_id bigint;
+BEGIN
+  IF (TG_TABLE_NAME = 'ordens_fabrico') THEN
+    target_project_id := NEW.projeto_id;
+  ELSIF (TG_TABLE_NAME = 'tarefas') THEN
+    SELECT projeto_id INTO target_project_id FROM public.ordens_fabrico WHERE id = NEW.ordem_id;
+  END IF;
+
+  IF target_project_id IS NOT NULL THEN
+    UPDATE public.projectos 
+    SET ultimo_movimento = now() 
+    WHERE id = target_project_id;
+  END IF;
+  
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Funcao de Trigger: Novo utilizador (Auth -> User_Roles)
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger AS $$
 BEGIN
@@ -84,102 +127,72 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-
 -- ---------------------------------------------------------------------
---  PASSO 4 - Trigger para novos utilizadores (apenas se nao existir)
--- ---------------------------------------------------------------------
-
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_trigger WHERE tgname = 'on_auth_user_created'
-  ) THEN
-    CREATE TRIGGER on_auth_user_created
-      AFTER INSERT ON auth.users
-      FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
-  END IF;
-END $$;
-
-
--- ---------------------------------------------------------------------
---  PASSO 5 - Row Level Security (ativar RLS)
+--  PASSO 3 - Triggers
 -- ---------------------------------------------------------------------
 
+-- Trigger: Auth Users -> User Roles
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- Trigger: Atualizar movimento ao mexer em OFs
+DROP TRIGGER IF EXISTS trigger_update_movement_of ON public.ordens_fabrico;
+CREATE TRIGGER trigger_update_movement_of
+  AFTER INSERT OR UPDATE ON public.ordens_fabrico
+  FOR EACH ROW EXECUTE FUNCTION public.update_project_movement();
+
+-- Trigger: Atualizar movimento ao mexer em Tarefas
+DROP TRIGGER IF EXISTS trigger_update_movement_task ON public.tarefas;
+CREATE TRIGGER trigger_update_movement_task
+  AFTER INSERT OR UPDATE ON public.tarefas
+  FOR EACH ROW EXECUTE FUNCTION public.update_project_movement();
+
+-- ---------------------------------------------------------------------
+--  PASSO 4 - Seguranca (RLS e Permissoes)
+-- ---------------------------------------------------------------------
+
+-- Ativar RLS
 ALTER TABLE public.projectos      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ordens_fabrico ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tarefas        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_roles     ENABLE ROW LEVEL SECURITY;
 
+-- Politicas: Projectos
+DROP POLICY IF EXISTS "Acesso Total Projectos" ON public.projectos;
+CREATE POLICY "Acesso Total Projectos" ON public.projectos
+  FOR ALL USING (auth.uid() = user_id OR public.is_admin());
+
+-- Politicas: Ordens de Fabrico
+DROP POLICY IF EXISTS "Acesso Total Ordens" ON public.ordens_fabrico;
+CREATE POLICY "Acesso Total Ordens" ON public.ordens_fabrico
+  FOR ALL USING (auth.uid() = user_id OR public.is_admin());
+
+-- Politicas: Tarefas
+DROP POLICY IF EXISTS "Acesso Total Tarefas" ON public.tarefas;
+CREATE POLICY "Acesso Total Tarefas" ON public.tarefas
+  FOR ALL USING (auth.uid() = user_id OR public.is_admin());
+
+-- Politicas: User Roles
+DROP POLICY IF EXISTS "Leitura Roles" ON public.user_roles;
+CREATE POLICY "Leitura Roles" ON public.user_roles
+  FOR SELECT USING (auth.uid() = user_id OR public.is_admin());
+
+DROP POLICY IF EXISTS "Escrita Roles (Admin)" ON public.user_roles;
+CREATE POLICY "Escrita Roles (Admin)" ON public.user_roles
+  FOR UPDATE USING (public.is_admin());
 
 -- ---------------------------------------------------------------------
---  PASSO 6 - Politicas RLS (criadas apenas se nao existirem)
+--  PASSO 5 - Permissoes de Execucao (Essencial para RPC no Supabase)
 -- ---------------------------------------------------------------------
 
-DO $$
-BEGIN
-
-  -- Projectos: remove policy antiga (sem suporte admin) se existir
-  DROP POLICY IF EXISTS "Utilizador so pode gerir os seus Projetos" ON public.projectos;
-
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies
-    WHERE tablename = 'projectos'
-      AND policyname = 'Acesso Total Projectos (User ou Admin)'
-  ) THEN
-    CREATE POLICY "Acesso Total Projectos (User ou Admin)" ON public.projectos
-      FOR ALL USING (auth.uid() = user_id OR public.is_admin());
-  END IF;
-
-  -- Ordens de Fabrico
-  DROP POLICY IF EXISTS "Utilizador so pode gerir as suas Ordens" ON public.ordens_fabrico;
-
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies
-    WHERE tablename = 'ordens_fabrico'
-      AND policyname = 'Acesso Total Ordens (User ou Admin)'
-  ) THEN
-    CREATE POLICY "Acesso Total Ordens (User ou Admin)" ON public.ordens_fabrico
-      FOR ALL USING (auth.uid() = user_id OR public.is_admin());
-  END IF;
-
-  -- Tarefas
-  DROP POLICY IF EXISTS "Utilizador so pode gerir as suas Tarefas" ON public.tarefas;
-
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies
-    WHERE tablename = 'tarefas'
-      AND policyname = 'Acesso Total Tarefas (User ou Admin)'
-  ) THEN
-    CREATE POLICY "Acesso Total Tarefas (User ou Admin)" ON public.tarefas
-      FOR ALL USING (auth.uid() = user_id OR public.is_admin());
-  END IF;
-
-  -- User Roles: leitura (proprio ou admin)
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies
-    WHERE tablename = 'user_roles' AND policyname = 'Leitura de Roles'
-  ) THEN
-    CREATE POLICY "Leitura de Roles" ON public.user_roles
-      FOR SELECT USING (auth.uid() = user_id OR public.is_admin());
-  END IF;
-
-  -- User Roles: escrita (apenas admin)
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies
-    WHERE tablename = 'user_roles' AND policyname = 'Admin gere Roles'
-  ) THEN
-    CREATE POLICY "Admin gere Roles" ON public.user_roles
-      FOR UPDATE USING (public.is_admin());
-  END IF;
-
-END $$;
-
+GRANT USAGE ON SCHEMA public TO anon, authenticated;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated;
+GRANT ALL ON ALL FUNCTIONS IN SCHEMA public TO anon, authenticated;
 
 -- =====================================================================
---  APOS EXECUTAR - Promover o primeiro administrador manualmente:
---
---  UPDATE public.user_roles
---  SET role = 'admin'
---  WHERE email = 'o-teu-email@empresa.com';
---
+--  DICA: Para promover um Admin manualmente execute:
+--  UPDATE public.user_roles SET role = 'admin' WHERE email = 'teu@email.com';
 -- =====================================================================
