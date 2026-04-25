@@ -45,6 +45,10 @@ interface AppState {
   setUserMgmtOpen: (open: boolean) => void;
   setPasswordRecovery: (active: boolean) => void;
 
+  viewingUserId: string | null;
+  viewingUserName: string | null;
+  setViewingUser: (id: string | null, name: string | null) => void;
+
   setOnlineStatus: (online: boolean) => void;
   setSyncing: (syncing: boolean) => void;
   setLastSyncAt: (ts: string) => void;
@@ -96,6 +100,10 @@ export const useAppStore = create<AppState>()(
   setUserRole: (role) => set({ userRole: role }),
   setUserMgmtOpen: (open) => set({ isUserMgmtOpen: open }),
   setPasswordRecovery: (active) => set({ isPasswordRecovery: active }),
+
+  viewingUserId: null,
+  viewingUserName: null,
+  setViewingUser: (id, name) => set({ viewingUserId: id, viewingUserName: name }),
 
   setOnlineStatus: (online) => set({ isOnline: online }),
   setSyncing: (syncing) => set({ isSyncing: syncing }),

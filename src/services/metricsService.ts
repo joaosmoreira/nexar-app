@@ -45,7 +45,7 @@ export async function fetchAlertOFs(limit = 6): Promise<OrdemFabrico[]> {
   if (isOnline()) {
     const { data, error } = await supabase
       .from('ordens_fabrico')
-      .select('id, numero_of, nome_of, status, criado_em, prazo_limite, projeto_id, tarefas(concluido), projectos(nome)')
+      .select('id, numero_of, nome_of, status, criado_em, prazo_limite, projeto_id, tarefas(concluido), projectos(nome, user_id)')
       .order('criado_em', { ascending: true })
       .limit(100);
 
@@ -53,6 +53,7 @@ export async function fetchAlertOFs(limit = 6): Promise<OrdemFabrico[]> {
 
     const open: OrdemFabrico[] = (data || []).map((of: any) => ({
       ...of,
+      user_id: of.projectos?.user_id,
       status: of.status || 'em_progresso',
       progress: of.tarefas ? Math.round((of.tarefas.filter((t: any) => t.concluido).length / of.tarefas.length) * 100) : 0,
       tarefas: (of.tarefas || []).map((t: any) => ({
@@ -70,7 +71,7 @@ export async function fetchAlertOFs(limit = 6): Promise<OrdemFabrico[]> {
     const urgent = open.filter((of: any) => {
       if (!of.prazo_limite) return false;
       const diff = new Date(of.prazo_limite).getTime() - now;
-      return diff >= 0 && diff <= sevenDaysMs;
+      return diff <= sevenDaysMs;
     }).sort((a: any, b: any) =>
       new Date(a.prazo_limite).getTime() - new Date(b.prazo_limite).getTime()
     );
@@ -84,6 +85,7 @@ export async function fetchAlertOFs(limit = 6): Promise<OrdemFabrico[]> {
     const ofsByProjeto = cache.ofsByProjeto || {};
     const projetos: Projeto[] = [...(cache.projetos || []), ...(cache.projetoArquivados || [])];
     const projetoMap = new Map(projetos.map((p) => [p.id, p.nome]));
+    const projetoUserMap = new Map(projetos.map((p) => [p.id, p.user_id]));
 
     const now = Date.now();
     const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
@@ -95,13 +97,13 @@ export async function fetchAlertOFs(limit = 6): Promise<OrdemFabrico[]> {
         if (total === 0) return true;
         return of.tarefas.filter((t: any) => t.concluido).length < total;
       })
-      .map((of: any) => ({ ...of, projectos: { nome: projetoMap.get(of.projeto_id) || '' } }));
+      .map((of: any) => ({ ...of, user_id: projetoUserMap.get(of.projeto_id), projectos: { nome: projetoMap.get(of.projeto_id) || '' } }));
 
     const urgent = allOfs
       .filter((of: any) => {
         if (!of.prazo_limite) return false;
         const diff = new Date(of.prazo_limite).getTime() - now;
-        return diff >= 0 && diff <= sevenDaysMs;
+        return diff <= sevenDaysMs;
       })
       .sort((a: any, b: any) => new Date(a.prazo_limite).getTime() - new Date(b.prazo_limite).getTime());
 

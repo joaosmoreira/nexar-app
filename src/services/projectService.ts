@@ -48,7 +48,7 @@ export async function fetchProjetosArquivados(): Promise<Projeto[]> {
   }
 }
 
-export async function createProjetoRemote(nome: string, cliente: string): Promise<Projeto> {
+export async function createProjetoRemote(nome: string, cliente: string, userId?: string): Promise<Projeto> {
   const refCode = nome.split(' ')[0];
   const { data: existing } = await supabase
     .from('projectos')
@@ -72,9 +72,12 @@ export async function createProjetoRemote(nome: string, cliente: string): Promis
     }
   }
 
+  const insertData: any = { nome, cliente };
+  if (userId) insertData.user_id = userId;
+
   const { data, error } = await supabase
     .from('projectos')
-    .insert([{ nome, cliente }])
+    .insert([insertData])
     .select()
     .single();
   if (error) throw error;
@@ -110,10 +113,18 @@ export async function updateProjetoNotasRemote(projetoId: number, notas: string)
   if (error) throw error;
 }
 
+export async function updateProjetoRemote(projetoId: number, fields: { anexo_url?: string | null }) {
+  const { error } = await supabase
+    .from('projectos')
+    .update(fields)
+    .eq('id', projetoId);
+  if (error) throw error;
+}
+
 export async function reorderProjetosRemote(projetos: { id: number; ordem_index: number }[]) {
   const { error } = await supabase.rpc('reorder_items', {
     table_name: 'projectos',
-    items: projetos
+    updates: projetos
   });
   if (error) throw error;
 }

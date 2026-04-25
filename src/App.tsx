@@ -191,9 +191,18 @@ function App() {
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
 
+    // Keep-alive: renovar sessão se a app voltar a ter foco (ex: acordar do minimizado)
+    const handleFocus = () => {
+      if (navigator.onLine) {
+        supabase.auth.refreshSession().catch(e => console.warn("[Nexar] Erro no refresh de sessão on-focus:", e));
+      }
+    };
+    window.addEventListener("focus", handleFocus);
+
     return () => {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("focus", handleFocus);
     };
   }, [setOnlineStatus, setSyncing, setLastSyncAt, setPendingMutations]);
 

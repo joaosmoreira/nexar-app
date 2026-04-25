@@ -4,6 +4,7 @@ export interface Projeto {
   nome: string;
   cliente: string;
   criado_em: string;
+  anexo_url?: string | null;
   arquivado?: boolean;
   informacoes_gerais?: string;
   ordem_index?: number;
@@ -20,6 +21,7 @@ export interface OrdemFabrico {
   prazo_limite?: string | null;
   tarefas?: Tarefa[];
   notas?: string;
+  anexo_url?: string | null;
   progress?: number;
 }
 
@@ -34,6 +36,7 @@ export interface Tarefa {
 export interface UserWithRole {
   user_id: string;
   email: string;
+  nome?: string;
   role: 'admin' | 'user';
 }
 

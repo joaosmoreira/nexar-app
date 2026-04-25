@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Folder, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Folder, AlertTriangle, CheckCircle2, ExternalLink } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { fetchOfsByProjeto, Projeto, OrdemFabrico } from '../../services/api';
 import { cn } from '../../lib/utils';
@@ -96,6 +96,18 @@ export function ProjectItem({ projeto, deadlineProjectIds, completedProjectIds, 
            <div className="text-[10px] font-bold tracking-widest uppercase text-sky-500/70 mb-0.5">{ref}</div>
            <div className="text-[13px] font-medium leading-tight truncate text-slate-300 group-hover:text-slate-100 transition-colors">{projNameOnly}</div>
         </div>
+        {projeto.anexo_url && (
+          <a
+            href={projeto.anexo_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="p-1.5 text-slate-500 hover:text-sky-400 hover:bg-sky-500/10 rounded transition-all shrink-0"
+            title="Abrir Pasta da Cloud"
+          >
+            <ExternalLink size={14} />
+          </a>
+        )}
       </button>
 
       {/* Container com transição suave de expansão */}

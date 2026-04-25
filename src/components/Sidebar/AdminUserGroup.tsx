@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { Projeto, UserWithRole } from '../../services/api';
@@ -14,15 +14,42 @@ interface AdminUserGroupProps {
 
 export function AdminUserGroup({ userInfo, projetos, deadlineProjectIds, completedProjectIds }: AdminUserGroupProps) {
   const [expanded, setExpanded] = useState(false);
-  // Seletor granular para o ID do utilizador atual
   const currentUserId = useAppStore(s => s.user?.id);
+  const viewingUserId = useAppStore(s => s.viewingUserId);
+  const selectedProjectId = useAppStore(s => s.selectedProjectId);
+
   const isCurrentUser = userInfo.user_id === currentUserId;
   const emailLabel = userInfo.email.split('@')[0];
+  const displayName = userInfo.nome || emailLabel;
+
+  const hasSelectedProject = selectedProjectId ? projetos.some(p => p.id === selectedProjectId) : false;
+  const isViewedUser = viewingUserId === userInfo.user_id;
+
+  // Auto expandir/colapsar conforme o utilizador visualizado ou obra selecionada
+  useEffect(() => {
+    if (isViewedUser || hasSelectedProject) {
+      setExpanded(true);
+    } else if (viewingUserId || selectedProjectId) {
+      // Se mudou de utilizador/obra ativamente e não é este, colapsar
+      setExpanded(false);
+    }
+  }, [isViewedUser, hasSelectedProject, viewingUserId, selectedProjectId]);
 
   return (
     <div className="mb-1">
       <button
-        onClick={() => setExpanded(!expanded)}
+        onClick={() => {
+          const newState = !expanded;
+          if (newState) {
+            // Ao expandir, o admin passa a "ver" o dashboard deste utilizador
+            useAppStore.getState().setViewingUser(userInfo.user_id, displayName);
+            useAppStore.getState().setUserMgmtOpen(false);
+          } else if (isViewedUser) {
+            // Se colapsar o utilizador que estávamos a ver, limpamos a vista
+            useAppStore.getState().setViewingUser(null, null);
+          }
+          setExpanded(newState);
+        }}
         className={cn(
           "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all group",
           expanded ? "bg-violet-500/10 text-violet-300" : "hover:bg-slate-800/50 text-slate-400"
@@ -44,7 +71,7 @@ export function AdminUserGroup({ userInfo, projetos, deadlineProjectIds, complet
           {emailLabel[0].toUpperCase()}
         </div>
         <div className="flex-1 text-left truncate">
-          <div className="text-[12px] font-medium truncate">{emailLabel}</div>
+          <div className="text-[12px] font-medium truncate">{displayName}</div>
           <div className="text-[10px] opacity-50 truncate">{projetos.length} obra{projetos.length !== 1 ? 's' : ''}</div>
         </div>
         {isCurrentUser && (

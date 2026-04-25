@@ -59,7 +59,7 @@ export async function deleteOrdemFabricoRemote(id: number) {
   if (error) throw error;
 }
 
-export async function updateOrdemFabricoRemote(ofId: number, fields: { nome_of?: string; numero_of?: string; notas?: string; prazo_limite?: string | null }) {
+export async function updateOrdemFabricoRemote(ofId: number, fields: { nome_of?: string; numero_of?: string; notas?: string; prazo_limite?: string | null; anexo_url?: string | null }) {
   const { error } = await supabase.from('ordens_fabrico').update(fields).eq('id', ofId);
   if (error) throw error;
 }
@@ -67,7 +67,7 @@ export async function updateOrdemFabricoRemote(ofId: number, fields: { nome_of?:
 export async function reorderTarefasRemote(tarefas: { id: number; ordem_index: number }[]) {
   const { error } = await supabase.rpc('reorder_items', {
     table_name: 'tarefas',
-    items: tarefas
+    updates: tarefas
   });
   if (error) throw error;
 }

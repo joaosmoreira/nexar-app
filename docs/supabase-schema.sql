@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS public.projectos (
   user_id          uuid REFERENCES auth.users(id) DEFAULT auth.uid() NOT NULL,
   nome             text NOT NULL,
   cliente          text,
+  anexo_url        text,
   arquivado        boolean DEFAULT false,
   ordem_index      int8 DEFAULT 0,
   ultimo_movimento timestamp with time zone DEFAULT now(),
@@ -36,6 +37,7 @@ CREATE TABLE IF NOT EXISTS public.ordens_fabrico (
   numero_of    text NOT NULL,
   status       text DEFAULT 'pendente',
   notas        text,
+  anexo_url    text,
   prazo_limite timestamp with time zone,
   criado_em    timestamp with time zone DEFAULT now(),
   ordem_index  int8 DEFAULT 0
@@ -55,7 +57,8 @@ CREATE TABLE IF NOT EXISTS public.tarefas (
 CREATE TABLE IF NOT EXISTS public.user_roles (
   user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
   role    text NOT NULL CHECK (role IN ('admin', 'user')) DEFAULT 'user',
-  email   text NOT NULL
+  email   text NOT NULL,
+  nome    text
 );
 
 -- ---------------------------------------------------------------------
@@ -73,6 +76,22 @@ BEGIN
   );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Trigger: Preencher nome via Auth
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger AS $$
+BEGIN
+  INSERT INTO public.user_roles (user_id, email, nome, role)
+  VALUES (new.id, new.email, new.raw_user_meta_data->>'full_name', 'user')
+  ON CONFLICT (user_id) DO UPDATE SET nome = EXCLUDED.nome;
+  RETURN new;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT OR UPDATE ON auth.users
+  FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
 
 -- RPC: Reordenacao generica (Chamada em projectService e ofService)
 CREATE OR REPLACE FUNCTION public.reorder_items(
@@ -116,16 +135,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Funcao de Trigger: Novo utilizador (Auth -> User_Roles)
-CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS trigger AS $$
-BEGIN
-  INSERT INTO public.user_roles (user_id, email, role)
-  VALUES (new.id, new.email, 'user')
-  ON CONFLICT (user_id) DO NOTHING;
-  RETURN new;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ---------------------------------------------------------------------
 --  PASSO 3 - Triggers

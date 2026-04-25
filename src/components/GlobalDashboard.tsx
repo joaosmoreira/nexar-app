@@ -3,6 +3,7 @@ import { fetchDashboardMetrics, fetchAlertOFs } from '../services/api';
 import { useAppStore } from '../store/useAppStore';
 import { LayoutGrid, Layers, Archive, Factory, AlertTriangle, Clock, CalendarClock } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { useAutoAnimate } from '@formkit/auto-animate/react';
 
 // Helper para navegar directamente para uma OF (define projecto + OF)
 function navigateToOf(projetoId: number, ofId: number) {
@@ -17,10 +18,13 @@ function AgeDot({ days }: { days: number }) {
 }
 
 export function GlobalDashboard() {
-  const { isArchiveMode, setSelectedProject, dataVersion, user, userRole, isUserMgmtOpen } = useAppStore();
+  const { isArchiveMode, setSelectedProject, dataVersion, user, userRole, isUserMgmtOpen, viewingUserId, viewingUserName, setViewingUser } = useAppStore();
   const [metrics, setMetrics] = useState<any[]>([]);
   const [oldestOfs, setOldestOfs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const [alertsParent] = useAutoAnimate();
+  const [gridParent] = useAutoAnimate();
 
   const isAdmin = userRole === 'admin';
 
@@ -35,8 +39,14 @@ export function GlobalDashboard() {
       let filteredMetrics = data;
       let filteredOldest = oldest;
 
-      // Admin em modo normal: apenas os seus projetos
-      if (isAdmin && !isUserMgmtOpen && user) {
+      // Filtragem: se estiver a ver outro utilizador, ou se for Admin/User normal
+      if (viewingUserId) {
+        filteredMetrics = data.filter((p: any) => p.user_id === viewingUserId);
+        filteredOldest = oldest.filter((o: any) => o.user_id === viewingUserId);
+      } else if (isAdmin && !isUserMgmtOpen && user) {
+        filteredMetrics = data.filter((p: any) => p.user_id === user.id);
+        filteredOldest = oldest.filter((o: any) => o.user_id === user.id);
+      } else if (!isAdmin && user) {
         filteredMetrics = data.filter((p: any) => p.user_id === user.id);
         filteredOldest = oldest.filter((o: any) => o.user_id === user.id);
       }
@@ -54,7 +64,7 @@ export function GlobalDashboard() {
     // Se já temos métricas e apenas o dataVersion mudou, fazemos refresh silencioso
     const isSilent = metrics.length > 0;
     loadMetrics(isSilent);
-  }, [isArchiveMode, dataVersion, isUserMgmtOpen, userRole]);
+  }, [isArchiveMode, dataVersion, isUserMgmtOpen, userRole, viewingUserId]);
 
   if (loading && metrics.length === 0) {
      return <div className="p-8 text-slate-400 font-medium animate-pulse">A carregar métricas globais...</div>;
@@ -62,6 +72,29 @@ export function GlobalDashboard() {
 
   return (
     <div className="p-8 pb-32 h-full overflow-y-auto">
+      {viewingUserId && (
+        <div className="bg-sky-500/10 border border-sky-500/20 text-sky-400 p-4 rounded-xl mb-6 flex items-center justify-between shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-sky-500/20 flex items-center justify-center">
+              <Layers size={16} />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold">A visualizar o Dashboard de {viewingUserName}</h3>
+              <p className="text-xs text-sky-500/70">Estás a ver as obras e estatísticas associadas a este utilizador.</p>
+            </div>
+          </div>
+          <button 
+            onClick={() => {
+              setViewingUser(null, null);
+              useAppStore.getState().setUserMgmtOpen(true);
+            }} 
+            className="text-xs font-medium px-3 py-1.5 bg-sky-500/20 hover:bg-sky-500/30 active:scale-95 transition-all rounded-lg"
+          >
+            Sair desta vista
+          </button>
+        </div>
+      )}
+
       <div className="flex items-center gap-3 mb-8">
         <div className={cn("p-3 rounded-xl shadow-lg border", isArchiveMode ? "bg-amber-500/20 text-amber-500 border-amber-500/30" : "bg-sky-500/20 text-sky-400 border-sky-500/30")}>
            {isArchiveMode ? <Archive size={24} /> : <LayoutGrid size={24} />}
@@ -85,7 +118,7 @@ export function GlobalDashboard() {
               Ordens em Aberto — Aguardam Despacho
             </h2>
           </div>
-          <div className="grid gap-3 grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
+          <div ref={alertsParent as any} className="grid gap-3 grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
             {oldestOfs.map((of: any) => {
               const ageDays = Math.floor((Date.now() - new Date(of.criado_em).getTime()) / (1000 * 60 * 60 * 24));
               const projNome = of.projectos?.nome || '';
@@ -146,7 +179,7 @@ export function GlobalDashboard() {
            <span className="text-lg font-medium">Nenhum projeto encontrado.</span>
         </div>
       ) : (
-        <div className="grid gap-6" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(max(280px, calc(33.333% - 16px)), 1fr))' }}>
+        <div ref={gridParent as any} className="grid gap-6" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(max(280px, calc(33.333% - 16px)), 1fr))' }}>
           {metrics.map(projeto => {
              let abertas = 0;
              let concluido = 0;

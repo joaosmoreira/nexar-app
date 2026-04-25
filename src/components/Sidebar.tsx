@@ -33,6 +33,7 @@ export function Sidebar() {
   const hasPendingMutations = useAppStore(s => s.hasPendingMutations);
   const isUserMgmtOpen = useAppStore(s => s.isUserMgmtOpen);
   const setUserMgmtOpen = useAppStore(s => s.setUserMgmtOpen);
+  const viewingUserId = useAppStore(s => s.viewingUserId);
 
   const {
     projetos, setProjetos, loading, deadlineProjectIds, 
@@ -137,13 +138,27 @@ export function Sidebar() {
   const [modalOpen, setModalOpen] = useState(false);
   const [newProjRef, setNewProjRef] = useState("");
   const [newProjCli, setNewProjCli] = useState("");
+  const [targetUserId, setTargetUserId] = useState<string>("");
+
+  useEffect(() => {
+    if (modalOpen) {
+      setTargetUserId(viewingUserId || user?.id || "");
+    }
+  }, [modalOpen, viewingUserId, user?.id]);
 
   const handleCreateProjeto = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProjRef) return;
     try {
       const formattedRef = `GS${newProjRef}`;
-      await createProjeto(formattedRef, newProjCli.trim() === "" ? "Desconhecido" : newProjCli);
+      const finalUserId = (isAdmin && (isUserMgmtOpen || viewingUserId)) ? targetUserId : undefined;
+      
+      await createProjeto(
+        formattedRef, 
+        newProjCli.trim() === "" ? "Desconhecido" : newProjCli,
+        finalUserId
+      );
+      
       await loadProjetos();
       setModalOpen(false);
       setNewProjRef(""); setNewProjCli("");
@@ -156,7 +171,7 @@ export function Sidebar() {
 
   // Memorizar as listas para evitar recálculo ao apenas selecionar uma obra
   const { gs0000, outrosProjetos } = useMemo(() => {
-    const myProjetos = isAdmin && !isUserMgmtOpen
+    const myProjetos = isAdmin && !(isUserMgmtOpen || viewingUserId)
       ? projetos.filter(p => p.user_id === user?.id)
       : projetos;
 
@@ -171,7 +186,7 @@ export function Sidebar() {
       });
 
     return { gs0000: gs, outrosProjetos: others };
-  }, [projetos, isAdmin, isUserMgmtOpen, user?.id, completedProjectIds]);
+  }, [projetos, isAdmin, isUserMgmtOpen, viewingUserId, user?.id, completedProjectIds]);
 
   const userGroups = useMemo(() => {
     if (!isAdmin || allUsers.length === 0) return [];
@@ -234,6 +249,23 @@ export function Sidebar() {
               className="w-full bg-slate-950 border border-slate-800 text-slate-200 rounded-lg p-2.5 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none transition-all"
             />
           </div>
+
+          {isAdmin && (isUserMgmtOpen || viewingUserId) && (
+            <div>
+              <label className="block text-sm font-medium text-slate-400 mb-1">Atribuir a Utilizador</label>
+              <select
+                value={targetUserId}
+                onChange={e => setTargetUserId(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 text-slate-200 rounded-lg p-2.5 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none transition-all"
+              >
+                {allUsers.map(u => (
+                  <option key={u.user_id} value={u.user_id}>
+                    {u.nome || u.email}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <button type="submit" className="mt-2 w-full bg-sky-500 hover:bg-sky-400 active:scale-95 text-white font-medium rounded-lg p-3 transition-all duration-150">
             Adicionar Projeto
           </button>
@@ -247,6 +279,7 @@ export function Sidebar() {
           useAppStore.getState().setSelectedProject(null); 
           useAppStore.getState().setSelectedOf(null);
           useAppStore.getState().setUserMgmtOpen(false);
+          useAppStore.getState().setViewingUser(null, null); // Limpar impersonation ao voltar ao HUB
           useAppStore.getState().incrementDataVersion(); 
         }}
         className="p-4 border-b border-slate-800 flex items-center gap-3 w-full text-left hover:bg-slate-800/30 active:scale-[0.98] transition-all duration-150 group cursor-pointer shrink-0"
@@ -310,9 +343,27 @@ export function Sidebar() {
           <div className="text-sm text-slate-500 px-3 text-center py-4 border border-dashed border-slate-800 rounded-lg">
             Nenhum projeto encontrado.
           </div>
-        ) : isAdmin && isUserMgmtOpen && userGroups.length > 0 ? (
+        ) : isAdmin && (isUserMgmtOpen || viewingUserId) && userGroups.length > 0 ? (
           /* ── Vista Admin: agrupada por utilizador ──────────── */
           <div className="space-y-1">
+            <button 
+              onClick={() => {
+                useAppStore.getState().setViewingUser(null, null);
+                setUserMgmtOpen(true);
+                useAppStore.getState().setSelectedProject(null);
+                useAppStore.getState().setSelectedOf(null);
+              }}
+              className={cn(
+                "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all mb-2 border",
+                (isUserMgmtOpen && !viewingUserId)
+                  ? "bg-violet-500/10 text-violet-300 border-violet-500/20"
+                  : "hover:bg-slate-800/50 text-slate-400 border-transparent"
+              )}
+            >
+              <Users size={14} className="shrink-0 text-violet-400" />
+              <span className="text-[12px] font-semibold">Painel Geral de Equipa</span>
+            </button>
+
             {userGroups.map(({ userInfo, projetos: userProjetos }) => (
               <AdminUserGroup
                 key={userInfo.user_id}
@@ -394,14 +445,19 @@ export function Sidebar() {
         {userRole === 'admin' && (
           <button
             onClick={() => {
-              setUserMgmtOpen(!isUserMgmtOpen);
+              if (viewingUserId) {
+                useAppStore.getState().setViewingUser(null, null);
+                setUserMgmtOpen(true);
+              } else {
+                setUserMgmtOpen(!isUserMgmtOpen);
+              }
               useAppStore.getState().setSelectedProject(null);
               useAppStore.getState().setSelectedOf(null);
               useAppStore.getState().setArchiveMode(false);
             }}
             className={cn(
               "w-full flex items-center justify-center gap-2 p-3 rounded-lg active:scale-[0.98] transition-all duration-150 border text-sm font-medium",
-              isUserMgmtOpen
+              (isUserMgmtOpen || viewingUserId)
                 ? "bg-violet-500/20 text-violet-300 border-violet-500/30"
                 : "text-slate-400 border-slate-700 hover:bg-slate-800 hover:text-slate-200"
             )}

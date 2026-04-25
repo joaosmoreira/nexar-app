@@ -15,6 +15,7 @@ export function useOfData(ofId: number) {
   const [notas, setNotas] = useState(cachedOf?.notas || '');
   const [initialNotas, setInitialNotas] = useState(cachedOf?.notas || '');
   const [prazoLimite, setPrazoLimite] = useState<string | null>(cachedOf?.prazo_limite || null);
+  const [anexoUrl, setAnexoUrl] = useState<string | null>(cachedOf?.anexo_url || null);
 
   const loadData = async (silent = false) => {
     if (!silent && !ofData) setLoading(true);
@@ -29,6 +30,7 @@ export function useOfData(ofId: number) {
       setNotas((oData as any).notas || '');
       setInitialNotas((oData as any).notas || '');
       setPrazoLimite((oData as any).prazo_limite || null);
+      setAnexoUrl((oData as any).anexo_url || null);
     }
     const tData = await fetchTarefasByOf(ofId);
     setTarefas(tData);
@@ -44,6 +46,7 @@ export function useOfData(ofId: number) {
       setNotas(cachedOf.notas || '');
       setInitialNotas(cachedOf.notas || '');
       setPrazoLimite(cachedOf.prazo_limite || null);
+      setAnexoUrl(cachedOf.anexo_url || null);
       if (cachedProject) setProjectName(cachedProject.nome);
     }
     const isSilent = previousOfId.current === ofId && !firstLoad.current;
@@ -55,6 +58,7 @@ export function useOfData(ofId: number) {
   return { 
     ofData, setOfData, tarefas, setTarefas, loading, 
     projectName, setProjectName, notas, setNotas, 
-    initialNotas, setInitialNotas, prazoLimite, setPrazoLimite, loadData 
+    initialNotas, setInitialNotas, prazoLimite, setPrazoLimite, 
+    anexoUrl, setAnexoUrl, loadData 
   };
 }

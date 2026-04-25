@@ -4,17 +4,24 @@ import {
   fetchNextGs0000OfNumber
 } from '../services/api';
 import { exportToJson, exportProjectExcelWithTasks } from '../lib/exportUtils';
-import { FileDown, PlusCircle, Archive, Trash2, CalendarClock, StickyNote } from 'lucide-react';
+import { FileDown, PlusCircle, Archive, Trash2, CalendarClock, StickyNote, ExternalLink, Layers } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { cn } from '../lib/utils';
 import { Modal } from './Modal';
 import { toast } from 'sonner';
 import { useProjectData } from '../hooks/useProjectData';
+import { useAutoAnimate } from '@formkit/auto-animate/react';
+import { updateProjeto } from '../services/api';
 
 export function ProjectView({ projetoId }: { projetoId: number }) {
   const { 
     projeto, ofs, loading, loadData 
   } = useProjectData(projetoId);
+
+  const { viewingUserId, viewingUserName, setViewingUser, setUserMgmtOpen } = useAppStore();
+
+  const [tableParent] = useAutoAnimate();
+  const [notesParent] = useAutoAnimate();
 
   const [creating, setCreating] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -22,6 +29,9 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
   const [newOfNumber, setNewOfNumber] = useState("");
   const [newOfPrazo, setNewOfPrazo] = useState("");
   const [isGs0000, setIsGs0000] = useState(false);
+
+  const [editingCloudLink, setEditingCloudLink] = useState(false);
+  const [tempCloudLink, setTempCloudLink] = useState("");
 
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deleteInputName, setDeleteInputName] = useState("");
@@ -137,9 +147,20 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
   if (loading) return <div className="p-8 text-slate-400">A carregar projeto...</div>;
   if (!projeto) return <div className="p-8 text-slate-400">Projeto não encontrado.</div>;
 
+  const handleSaveCloudLink = async () => {
+    try {
+      await updateProjeto(projetoId, { anexo_url: tempCloudLink.trim() || null });
+      setEditingCloudLink(false);
+      useAppStore.getState().incrementDataVersion();
+      toast.success("Link atualizado!");
+    } catch(e: any) {
+      toast.error(e.message);
+    }
+  };
+
 
   return (
-    <div className="flex h-full overflow-hidden">
+    <div className="flex flex-col xl:flex-row h-full overflow-hidden">
       {/* ── Main scrollable area ── */}
       <div className="flex-1 min-w-0 p-8 pb-32 overflow-auto relative">
       <Modal isOpen={archiveModalOpen} title="Arquivar Projeto" onClose={() => setArchiveModalOpen(false)}>
@@ -194,6 +215,29 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
         </form>
       </Modal>
 
+      {viewingUserId && (
+        <div className="bg-sky-500/10 border border-sky-500/20 text-sky-400 p-4 rounded-xl mb-6 flex items-center justify-between shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-sky-500/20 flex items-center justify-center">
+              <Layers size={16} />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold">A visualizar o Dashboard de {viewingUserName}</h3>
+              <p className="text-xs text-sky-500/70">Estás a ver as obras e estatísticas associadas a este utilizador.</p>
+            </div>
+          </div>
+          <button 
+            onClick={() => {
+              setViewingUser(null, null);
+              setUserMgmtOpen(true);
+            }} 
+            className="text-xs font-medium px-3 py-1.5 bg-sky-500/20 hover:bg-sky-500/30 active:scale-95 transition-all rounded-lg"
+          >
+            Sair desta vista
+          </button>
+        </div>
+      )}
+
       <div className="flex justify-between items-start mb-8">
         <div>
           <div className="text-xs text-sky-400 font-medium tracking-widest uppercase mb-2">DETALHES DO PROJETO {projeto.arquivado && <span className="text-amber-500 ml-2">(ARQUIVADO)</span>}</div>
@@ -223,6 +267,44 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
           <div className="text-sm text-slate-400 mb-1">OFs Concluídas</div>
           <div className="text-3xl font-light text-sky-400">{ofs.filter(o => o.progress === 100).length}</div>
         </div>
+        
+        {/* Pasta da Obra (Cloud) */}
+        <div className="bg-slate-800/50 border border-slate-700 p-5 rounded-2xl flex flex-col justify-center">
+          <div className="text-sm text-slate-400 mb-2 flex items-center gap-2">
+            <ExternalLink size={14} /> Pasta da Obra (Cloud)
+          </div>
+          {editingCloudLink ? (
+             <div className="flex flex-col gap-2">
+               <input 
+                 autoFocus
+                 type="url" 
+                 value={tempCloudLink} 
+                 onChange={e => setTempCloudLink(e.target.value)} 
+                 placeholder="Ex: https://sharepoint.com/..." 
+                 className="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded p-2 text-sm focus:border-sky-500 outline-none"
+               />
+               <div className="flex gap-2">
+                 <button onClick={handleSaveCloudLink} className="flex-1 bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium py-1.5 rounded transition-colors">Guardar</button>
+                 <button onClick={() => setEditingCloudLink(false)} className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-medium py-1.5 rounded transition-colors">Cancelar</button>
+               </div>
+             </div>
+          ) : projeto.anexo_url ? (
+             <div className="flex items-center gap-3">
+               <a href={projeto.anexo_url} target="_blank" rel="noopener noreferrer" className="flex-1 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/20 py-2 px-3 rounded text-sm font-medium text-center transition-all flex items-center justify-center gap-2 truncate">
+                 <ExternalLink size={14} /> Abrir Repositório
+               </a>
+               {!projeto.arquivado && (
+                 <button onClick={() => { setTempCloudLink(projeto.anexo_url || ""); setEditingCloudLink(true); }} className="text-xs text-slate-500 hover:text-slate-300 underline underline-offset-2 shrink-0">Editar</button>
+               )}
+             </div>
+          ) : !projeto.arquivado ? (
+             <button onClick={() => { setTempCloudLink(""); setEditingCloudLink(true); }} className="w-full border border-dashed border-slate-600 text-slate-500 hover:text-slate-300 hover:border-slate-500 py-2 rounded text-sm transition-colors flex items-center justify-center gap-2">
+               <PlusCircle size={14} /> Colar Link
+             </button>
+          ) : (
+             <div className="text-sm text-slate-500">Sem link associado</div>
+          )}
+        </div>
       </div>
 
 
@@ -237,7 +319,7 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
             <thead className="text-xs uppercase bg-slate-900/50 text-slate-400 font-medium tracking-wider">
               <tr><th className="px-4 py-3">Nº OF</th><th className="px-4 py-3">Nome</th><th className="px-4 py-3">Prazo</th><th className="px-4 py-3">Progresso</th><th className="px-4 py-3 text-right">Ação</th></tr>
             </thead>
-            <tbody className="divide-y divide-slate-800">
+            <tbody ref={tableParent as any} className="divide-y divide-slate-800">
               {ofs.map((of) => {
                 const prazo = formatPrazo(of.prazo_limite);
                 return (
@@ -246,7 +328,23 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
                     <td className="px-4 py-3 font-medium text-slate-200">{of.nome_of}</td>
                     <td className="px-4 py-3">{prazo ? <div className={cn("flex items-center gap-1.5", prazo.color)}><CalendarClock size={13} /><span>{prazo.label}</span></div> : "—"}</td>
                     <td className="px-4 py-3 w-56"><div className="flex items-center gap-3"><div className="w-full bg-slate-700 rounded-full h-1.5 flex-1 overflow-hidden"><div className={cn("h-1.5 rounded-full transition-all duration-500", of.progress === 100 ? "bg-emerald-400" : "bg-sky-500")} style={{ width: `${of.progress}%` }}></div></div><span className="text-xs font-medium text-slate-400 w-8">{of.progress}%</span></div></td>
-                    <td className="px-4 py-3 text-right"><button className="text-sky-500 group-hover:text-sky-300 font-medium">Abrir</button></td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex justify-end items-center gap-4">
+                        {of.anexo_url && (
+                          <a 
+                            href={of.anexo_url} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            onClick={(e) => e.stopPropagation()} 
+                            className="text-slate-500 hover:text-sky-400 p-1 hover:bg-sky-500/10 rounded transition-all"
+                            title="Abrir Pasta da Cloud"
+                          >
+                            <ExternalLink size={16} />
+                          </a>
+                        )}
+                        <button className="text-sky-500 group-hover:text-sky-300 font-medium">Abrir</button>
+                      </div>
+                    </td>
                   </tr>
                 );
               })}
@@ -258,7 +356,7 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
       </div>
 
       {/* ── Sidebar: Notas das OFs ── */}
-      <div className="w-80 shrink-0 border-l border-slate-800 bg-slate-900/40 flex flex-col h-full overflow-hidden">
+      <div className="w-full xl:w-80 shrink-0 border-t xl:border-t-0 xl:border-l border-slate-800 bg-slate-900/40 flex flex-col h-72 xl:h-full overflow-hidden">
         <div className="flex items-center gap-2 px-5 py-4 border-b border-slate-800 shrink-0 bg-slate-900/60">
           <StickyNote size={15} className="text-amber-400" />
           <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-300">Notas das OFs</h3>
@@ -267,7 +365,7 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
           {ofs.filter(o => o.notas).length === 0 ? (
             <div className="p-6 text-center text-sm text-slate-500">Sem notas registadas nas Ordens de Fabrico.</div>
           ) : (
-            <div className="flex flex-col divide-y divide-slate-800/60">
+            <div ref={notesParent as any} className="flex flex-col divide-y divide-slate-800/60">
               {ofs.filter(o => o.notas).map(o => (
                 <div 
                   key={o.id} 

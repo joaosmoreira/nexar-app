@@ -6,7 +6,7 @@ import {
   Tarefa,
 } from '../services/api';
 import { exportToExcel, exportToJson } from '../lib/exportUtils';
-import { FileDown, CheckCircle2, Circle, Settings2, Plus, Trash2, Pencil, GripVertical, Check, X, CalendarClock, AlertTriangle } from 'lucide-react';
+import { FileDown, CheckCircle2, Circle, Settings2, Plus, Trash2, Pencil, GripVertical, Check, X, CalendarClock, AlertTriangle, Link as LinkIcon, ExternalLink } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { cn } from '../lib/utils';
 import { Modal } from './Modal';
@@ -124,7 +124,8 @@ export function OfView({ ofId }: { ofId: number }) {
   const {
     ofData, setOfData, tarefas, setTarefas, loading, 
     projectName, notas, setNotas, 
-    setInitialNotas, prazoLimite, setPrazoLimite, loadData 
+    setInitialNotas, prazoLimite, setPrazoLimite, 
+    anexoUrl, setAnexoUrl, loadData 
   } = useOfData(ofId);
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -138,6 +139,8 @@ export function OfView({ ofId }: { ofId: number }) {
   const [activeId, setActiveId] = useState<number | null>(null);
   const [editingPrazo, setEditingPrazo] = useState(false);
   const [prazoEditValue, setPrazoEditValue] = useState('');
+  const [editingAnexo, setEditingAnexo] = useState(false);
+  const [anexoEditValue, setAnexoEditValue] = useState('');
   const ofNameInputRef = useRef<HTMLInputElement>(null);
   const ofNumeroInputRef = useRef<HTMLInputElement>(null);
 
@@ -230,6 +233,18 @@ export function OfView({ ofId }: { ofId: number }) {
     }
   };
 
+  const handleSaveAnexo = async () => {
+    const newAnexo = anexoEditValue.trim() || null;
+    try {
+      await updateOrdemFabrico(ofId, { anexo_url: newAnexo });
+      setAnexoUrl(newAnexo);
+      setEditingAnexo(false);
+      toast.success(newAnexo ? 'Link anexado.' : 'Link removido.');
+    } catch (e: any) {
+      toast.error('Erro ao guardar link: ' + e.message);
+    }
+  };
+
   const prazoInfo = (() => {
     if (!prazoLimite) return null;
     const d = new Date(prazoLimite);
@@ -292,7 +307,7 @@ export function OfView({ ofId }: { ofId: number }) {
   const activeTarefa = activeId ? tarefas.find(t => t.id === activeId) : null;
 
   return (
-    <div className="flex h-full overflow-hidden">
+    <div className="flex flex-col xl:flex-row h-full overflow-hidden">
       {/* ── Main scrollable area ── */}
       <div className="flex-1 min-w-0 p-8 pb-32 overflow-auto relative">
       <Modal isOpen={deleteModalOpen} title="Apagar Ordem de Fabrico" onClose={() => setDeleteModalOpen(false)}>
@@ -387,8 +402,43 @@ export function OfView({ ofId }: { ofId: number }) {
       </div>
     </div>
 
-    {/* ── Sidebar: Notas ── */}
-    <div className="w-80 shrink-0 border-l border-slate-800 bg-slate-900/40 flex flex-col h-full overflow-hidden">
+    {/* ── Sidebar: Notas e Anexos ── */}
+    <div className="w-full xl:w-80 shrink-0 border-t xl:border-t-0 xl:border-l border-slate-800 bg-slate-900/40 flex flex-col h-72 xl:h-full overflow-hidden">
+      
+      {/* ── Anexos da OF ── */}
+      <div className="p-5 border-b border-slate-800/60 bg-slate-900/60 shrink-0">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-medium text-slate-300 flex items-center gap-2">
+            <LinkIcon size={14} className="text-sky-500" />
+            Pasta da Obra (Cloud)
+          </h3>
+          {!editingAnexo && (
+            <button onClick={() => { setAnexoEditValue(anexoUrl || ''); setEditingAnexo(true); }} className="p-1 rounded text-slate-500 hover:text-sky-400 hover:bg-sky-500/10 transition-all">
+              <Pencil size={13} />
+            </button>
+          )}
+        </div>
+
+        {editingAnexo ? (
+          <div className="flex flex-col gap-2">
+            <input autoFocus type="url" value={anexoEditValue} onChange={e => setAnexoEditValue(e.target.value)} placeholder="https://..." className="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded-lg px-3 py-2 text-sm focus:border-sky-500 outline-none transition-all" />
+            <div className="flex gap-1.5">
+              <button onClick={handleSaveAnexo} className="flex-1 p-1.5 rounded-lg bg-sky-500/20 text-sky-400 hover:bg-sky-500/30 active:scale-95 transition-all text-xs font-medium flex items-center justify-center gap-1"><Check size={12} /> Guardar</button>
+              <button onClick={() => setEditingAnexo(false)} className="p-1.5 rounded-lg bg-slate-700/50 text-slate-400 hover:bg-slate-700 active:scale-95 transition-all"><X size={13} /></button>
+            </div>
+          </div>
+        ) : anexoUrl ? (
+          <a href={anexoUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-3 py-2.5 bg-slate-800/80 hover:bg-slate-800 border border-slate-700 hover:border-sky-500/50 text-slate-200 text-sm font-medium rounded-lg transition-all group overflow-hidden">
+            <ExternalLink size={14} className="text-sky-400 shrink-0" />
+            <span className="truncate text-xs text-sky-400 group-hover:underline">Abrir Repositório</span>
+          </a>
+        ) : (
+          <button onClick={() => { setAnexoEditValue(''); setEditingAnexo(true); }} className="w-full flex items-center justify-center gap-2 p-2.5 rounded-lg border border-dashed border-slate-700 text-slate-500 hover:text-sky-400 hover:border-sky-500/50 transition-all text-xs font-medium">
+            <Plus size={14} /> Colar Link da Cloud
+          </button>
+        )}
+      </div>
+
       <NotesPanel
         value={notas}
         onChange={setNotas}

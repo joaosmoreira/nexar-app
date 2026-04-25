@@ -3,7 +3,7 @@
   <h1>Nexar HUB</h1>
   <p><strong>Industrial Work Manager de Alta Performance</strong></p>
   <p>
-    <img alt="Versão" src="https://img.shields.io/badge/Versão-v1.1.0-blue?style=flat-square"/>
+    <img alt="Versão" src="https://img.shields.io/badge/Versão-v1.2.0-blue?style=flat-square"/>
     <img alt="Tauri" src="https://img.shields.io/badge/Tauri-v2-24C8DB?style=flat-square&logo=tauri&logoColor=white"/>
     <img alt="React" src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=white"/>
     <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.8-3178C6?style=flat-square&logo=typescript&logoColor=white"/>
@@ -17,7 +17,7 @@
 
 O **Nexar HUB** é uma solução desktop nativa (Windows & macOS) desenvolvida para a gestão e monitorização de fluxos de trabalho industriais. Projetada para substituir a fragmentação de ficheiros Excel, a aplicação oferece um ambiente centralizado, seguro e **offline-first** para o controlo total da produção.
 
-A versão **v1.1.0** marca um salto qualitativo na maturidade do projeto, introduzindo uma arquitetura modular, navegação instantânea e otimizações de performance de alto nível.
+A versão **v1.2.0** introduz ferramentas avançadas de gestão de equipa, permitindo uma supervisão completa da produtividade individual e centralização de repositórios BIM/Cloud.
 
 ---
 
@@ -55,24 +55,28 @@ graph TD
 
 ---
 
-## 🚀 Funcionalidades Principais (v1.1.0)
+## 🚀 Funcionalidades Principais (v1.2.0)
+
+### 👥 Gestão de Equipa & Impersonação (Novo)
+- **Modo Espião (Admin)**: Visualize o dashboard individual de qualquer colaborador com um clique, permitindo auditoria de prazos e carga de trabalho em tempo real.
+- **Identidade Real**: Interface totalmente limpa de identificadores técnicos; nomes reais são utilizados em toda a aplicação.
+- **Atribuição Inteligente**: Admins podem criar e atribuir obras diretamente a membros específicos da equipa.
+
+### 📁 Centralização de Repositórios BIM
+- **Cloud Connect**: Suporte para URLs de repositório (BIM, SharePoint) ao nível do projeto com atalhos de acesso rápido na barra lateral.
 
 ### ⚡ Navegação Instantânea
-- **Cache Global Inteligente**: Obras e Ordens de Fabrico são pré-carregadas no store global, eliminando ecrãs de "Loading" durante a navegação.
-- **Code-Splitting**: Utilização de `React.lazy` para carregar módulos apenas quando necessários, acelerando o arranque inicial.
+- **Cache Global Inteligente**: Obras e Ordens de Fabrico são pré-carregadas no store global, eliminando ecrãs de "Loading".
+- **Code-Splitting**: Utilização de `React.lazy` para carregamento modular.
 
 ### 📴 Robustez Offline-First
-- **Full Sync**: Funcionamento 100% autónomo sem internet com sincronização automática via fila de mutações.
-- **Persistência Local**: Cache de dados em JSON nativo para acesso imediato ao histórico.
+- **Full Sync**: Funcionamento 100% autónomo com sincronização automática via fila de mutações.
+- **Persistência Local**: Cache de dados em JSON nativo.
 
 ### 🔐 Segurança e RBAC
-- **Controlo de Acessos**: Diferenciação entre perfis Admin e User com Row Level Security (RLS).
-- **Proteção de Credenciais**: Fluxo de alteração de palavra-passe com validação obrigatória da credencial atual.
-
-### 📊 Monitorização Industrial
-- **Dashboard em Tempo Real**: Ponto de situação global com alertas visuais de prazos e inatividade.
+- **Controlo de Acessos**: Diferenciação robusta entre Admin e User com RLS no Supabase.
 - **Auto-Arquivo**: Gestão automática de portfólio para obras concluídas.
-- **Exportação Profissional**: Gerador de relatórios Excel estilizados e backups em JSON.
+- **Exportação Profissional**: Gerador de relatórios Excel estilizados.
 
 ---
 

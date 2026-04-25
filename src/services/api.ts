@@ -15,19 +15,19 @@ export * from './metricsService';
 //  FACHADA UNIFICADA (Lógica de Orquestração Online/Offline)
 // ─────────────────────────────────────────────────────────────────
 
-import { 
+import {
   createProjetoRemote, arquivarProjetoRemote, deleteProjetoRemote,
-  updateProjectoUltimoMovimentoRemote, updateProjetoNotasRemote, reorderProjetosRemote 
+  updateProjectoUltimoMovimentoRemote, updateProjetoNotasRemote, updateProjetoRemote, reorderProjetosRemote
 } from './projectService';
 
-import { 
-  createOFRemote, deleteOrdemFabricoRemote, 
-  updateOrdemFabricoRemote, reorderTarefasRemote 
+import {
+  createOFRemote, deleteOrdemFabricoRemote,
+  updateOrdemFabricoRemote, reorderTarefasRemote
 } from './ofService';
 
-import { 
-  createTarefaRemote, toggleTarefaConcluidaRemote, 
-  updateTarefaRemote, deleteTarefaRemote 
+import {
+  createTarefaRemote, toggleTarefaConcluidaRemote,
+  updateTarefaRemote, deleteTarefaRemote
 } from './taskService';
 
 import { Projeto, OrdemFabrico, Tarefa } from './types';
@@ -83,6 +83,22 @@ export async function updateProjetoNotas(projetoId: number, notas: string) {
   }
 }
 
+export async function updateProjeto(projetoId: number, fields: { anexo_url?: string | null }) {
+  if (isOnline()) {
+    await updateProjetoRemote(projetoId, fields);
+  } else {
+    const cache = await readCache();
+    const projetos = (cache.projetos || []).map((p: any) =>
+      p.id === projetoId ? { ...p, ...fields } : p
+    );
+    const arquivados = (cache.projetoArquivados || []).map((p: any) =>
+      p.id === projetoId ? { ...p, ...fields } : p
+    );
+    await patchCache({ projetos, projetoArquivados: arquivados });
+    await queueMutation({ action: 'updateProjeto', projetoId, fields });
+  }
+}
+
 export async function createOF(
   projetoId: number,
   nomeOf: string,
@@ -95,12 +111,12 @@ export async function createOF(
     const tempId = nextTempId();
     const now = new Date().toISOString();
     const predefinedTasks = [
-      { id: nextTempId(), ordem_id: tempId, nome_tarefa: 'Modelação',               concluido: false, ordem_index: 0 },
+      { id: nextTempId(), ordem_id: tempId, nome_tarefa: 'Modelação', concluido: false, ordem_index: 0 },
       { id: nextTempId(), ordem_id: tempId, nome_tarefa: 'Aprovisionamento Material', concluido: false, ordem_index: 1 },
-      { id: nextTempId(), ordem_id: tempId, nome_tarefa: 'Validação',                concluido: false, ordem_index: 2 },
-      { id: nextTempId(), ordem_id: tempId, nome_tarefa: 'Fabrico',                  concluido: false, ordem_index: 3 },
-      { id: nextTempId(), ordem_id: tempId, nome_tarefa: 'Parafusaria',              concluido: false, ordem_index: 4 },
-      { id: nextTempId(), ordem_id: tempId, nome_tarefa: 'Montagem',                  concluido: false, ordem_index: 5 },
+      { id: nextTempId(), ordem_id: tempId, nome_tarefa: 'Validação', concluido: false, ordem_index: 2 },
+      { id: nextTempId(), ordem_id: tempId, nome_tarefa: 'Fabrico', concluido: false, ordem_index: 3 },
+      { id: nextTempId(), ordem_id: tempId, nome_tarefa: 'Parafusaria', concluido: false, ordem_index: 4 },
+      { id: nextTempId(), ordem_id: tempId, nome_tarefa: 'Montagem', concluido: false, ordem_index: 5 },
     ];
     const newOf: OrdemFabrico = {
       id: tempId,
@@ -110,12 +126,12 @@ export async function createOF(
       status: 'em_progresso',
       criado_em: now,
       prazo_limite: prazoLimite || null,
-      tarefas: predefinedTasks.map(t => ({ 
-        id: t.id, 
-        ordem_id: t.ordem_id, 
-        nome_tarefa: t.nome_tarefa, 
-        concluido: t.concluido, 
-        ordem_index: t.ordem_index 
+      tarefas: predefinedTasks.map(t => ({
+        id: t.id,
+        ordem_id: t.ordem_id,
+        nome_tarefa: t.nome_tarefa,
+        concluido: t.concluido,
+        ordem_index: t.ordem_index
       })),
     };
 
@@ -129,26 +145,26 @@ export async function createOF(
   }
 }
 
-export async function createProjeto(nome: string, cliente: string): Promise<Projeto> {
+export async function createProjeto(nome: string, cliente: string, userId?: string): Promise<Projeto> {
   if (isOnline()) {
-    return createProjetoRemote(nome, cliente);
+    return createProjetoRemote(nome, cliente, userId);
   } else {
     const { data: { user } } = await supabase.auth.getUser();
     const tempId = nextTempId();
     const now = new Date().toISOString();
-    const newProjeto: Projeto = { 
-      id: tempId, 
-      user_id: user?.id || 'offline-user',
-      nome, 
-      cliente, 
-      criado_em: now, 
-      arquivado: false 
+    const newProjeto: Projeto = {
+      id: tempId,
+      user_id: userId || user?.id || 'offline-user',
+      nome,
+      cliente,
+      criado_em: now,
+      arquivado: false
     };
 
     const cache = await readCache();
     const projetos = [newProjeto, ...(cache.projetos || [])];
     await patchCache({ projetos });
-    await queueMutation({ action: 'createProjeto', tempId, nome, cliente });
+    await queueMutation({ action: 'createProjeto', tempId, nome, cliente, userId });
     return newProjeto;
   }
 }
@@ -206,7 +222,7 @@ export async function createTarefa(ofId: number, nomeTarefa: string, index: numb
   }
 }
 
-export async function updateOrdemFabrico(ofId: number, fields: { nome_of?: string; numero_of?: string; notas?: string; prazo_limite?: string | null }) {
+export async function updateOrdemFabrico(ofId: number, fields: { nome_of?: string; numero_of?: string; notas?: string; prazo_limite?: string | null; anexo_url?: string | null }) {
   if (isOnline()) {
     await updateOrdemFabricoRemote(ofId, fields);
   } else {
@@ -298,7 +314,7 @@ export async function getCachedProjectDetails(projetoId: number): Promise<{ proj
 
 export async function runAutoArchive() {
   if (!isOnline()) return;
-  
+
   const now = Date.now();
   const SevenDaysMs = 7 * 24 * 60 * 60 * 1000;
   const cutoffDate = new Date(now - SevenDaysMs).toISOString();

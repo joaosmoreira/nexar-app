@@ -15,7 +15,7 @@ export interface CacheData {
 }
 
 export type MutationAction =
-  | { action: 'createProjeto';   tempId: number; nome: string; cliente: string }
+  | { action: 'createProjeto';   tempId: number; nome: string; cliente: string; userId?: string }
   | { action: 'createOF';        tempId: number; projetoId: number; nomeOf: string; numeroOf: string; prazoLimite?: string | null }
   | { action: 'toggleTarefa';    tarefaId: number; concluido: boolean }
   | { action: 'arquivarProjeto'; projetoId: number }
@@ -28,7 +28,8 @@ export type MutationAction =
   | { action: 'deleteTarefa'; tarefaId: number }
   | { action: 'reorderTarefas'; tarefas: { id: number; ordem_index: number }[] }
   | { action: 'reorderProjetos'; projetos: { id: number; ordem_index: number }[] }
-  | { action: 'updateProjetoNotas'; projetoId: number; notas: string };
+  | { action: 'updateProjetoNotas'; projetoId: number; notas: string }
+  | { action: 'updateProjeto'; projetoId: number; fields: { anexo_url?: string | null } };
 
 interface PendingQueue {
   mutations: MutationAction[];
@@ -123,7 +124,7 @@ export function nextTempId(): number {
 // ─────────────────────────────────────────────
 
 export interface RemoteApi {
-  createProjetoRemote: (nome: string, cliente: string) => Promise<any>;
+  createProjetoRemote: (nome: string, cliente: string, userId?: string) => Promise<any>;
   createOFRemote: (projetoId: number, nomeOf: string, numeroOf: string, prazoLimite?: string | null) => Promise<any>;
   toggleTarefaConcluidaRemote: (tarefaId: number, concluido: boolean) => Promise<void>;
   arquivarProjetoRemote: (id: number) => Promise<void>;
@@ -131,12 +132,13 @@ export interface RemoteApi {
   deleteOrdemFabricoRemote: (id: number) => Promise<void>;
   createTarefaRemote: (ordemId: number, nome: string, index: number) => Promise<any>;
   updateProjectoUltimoMovimentoRemote: (id: number) => Promise<void>;
-  updateOrdemFabricoRemote?: (ofId: number, fields: { nome_of?: string; numero_of?: string; notas?: string }) => Promise<void>;
+  updateOrdemFabricoRemote?: (ofId: number, fields: { nome_of?: string; numero_of?: string; notas?: string; prazo_limite?: string | null; anexo_url?: string | null }) => Promise<void>;
   updateTarefaRemote?: (tarefaId: number, nome: string) => Promise<void>;
   deleteTarefaRemote?: (tarefaId: number) => Promise<void>;
   reorderTarefasRemote?: (tarefas: { id: number; ordem_index: number }[]) => Promise<void>;
   reorderProjetosRemote?: (projetos: { id: number; ordem_index: number }[]) => Promise<void>;
   updateProjetoNotasRemote?: (projetoId: number, notas: string) => Promise<void>;
+  updateProjetoRemote?: (projetoId: number, fields: { anexo_url?: string | null }) => Promise<void>;
 }
 
 /**
@@ -161,7 +163,7 @@ export async function flushPendingMutations(api: RemoteApi): Promise<{ flushed: 
       switch (mut.action) {
 
         case 'createProjeto': {
-          const proj = await api.createProjetoRemote(mut.nome, mut.cliente);
+          const proj = await api.createProjetoRemote(mut.nome, mut.cliente, mut.userId);
           idMap[mut.tempId] = proj.id;
           flushed++;
           break;
@@ -228,6 +230,13 @@ export async function flushPendingMutations(api: RemoteApi): Promise<{ flushed: 
         case 'updateProjetoNotas': {
           const realId = resolveId(mut.projetoId);
           if (api.updateProjetoNotasRemote) await api.updateProjetoNotasRemote(realId, mut.notas);
+          flushed++;
+          break;
+        }
+
+        case 'updateProjeto': {
+          const realId = resolveId(mut.projetoId);
+          if (api.updateProjetoRemote) await api.updateProjetoRemote(realId, mut.fields);
           flushed++;
           break;
         }

@@ -16,7 +16,7 @@ export async function fetchUserRole(): Promise<UserRole> {
 export async function fetchAllUsers(): Promise<UserWithRole[]> {
   const { data, error } = await supabase
     .from('user_roles')
-    .select('user_id, email, role')
+    .select('user_id, email, nome, role')
     .order('email', { ascending: true });
   if (error) throw error;
   return (data || []) as UserWithRole[];

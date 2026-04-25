@@ -6,7 +6,7 @@ import { cn } from '../lib/utils';
 import { toast } from 'sonner';
 
 export function UserManagement() {
-  const { user: currentUser, setUserMgmtOpen } = useAppStore();
+  const { user: currentUser, setUserMgmtOpen, setViewingUser } = useAppStore();
   const [users, setUsers] = useState<UserWithRole[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
@@ -113,12 +113,17 @@ export function UserManagement() {
               return (
                 <div
                   key={u.user_id}
+                  onClick={() => {
+                    setViewingUser(u.user_id, u.nome || u.email.split('@')[0]);
+                    setUserMgmtOpen(false);
+                  }}
                   className={cn(
-                    'flex items-center gap-4 px-5 py-4 rounded-xl border transition-all',
+                    'flex items-center gap-4 px-5 py-4 rounded-xl border transition-all cursor-pointer hover:shadow-lg',
                     isCurrentUser
                       ? 'bg-slate-800/40 border-slate-700/60'
-                      : 'bg-slate-800/20 border-slate-800 hover:border-slate-700'
+                      : 'bg-slate-800/20 border-slate-800 hover:border-slate-700 hover:bg-slate-800/40'
                   )}
+                  title="Ver Dashboard deste utilizador"
                 >
                   {/* Avatar placeholder */}
                   <div className={cn(
@@ -127,18 +132,18 @@ export function UserManagement() {
                       ? 'bg-violet-500/15 text-violet-300 border border-violet-500/25'
                       : 'bg-sky-500/10 text-sky-400 border border-sky-500/20'
                   )}>
-                    {u.email[0].toUpperCase()}
+                    {(u.nome || u.email)[0].toUpperCase()}
                   </div>
 
-                  {/* Email */}
+                  {/* Detalhes (Nome e Email) */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-slate-200 truncate">{u.email}</span>
+                      <span className="text-sm font-bold text-slate-200 truncate">{u.nome || u.email.split('@')[0]}</span>
                       {isCurrentUser && (
                         <span className="text-[10px] text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded font-medium shrink-0">Tu</span>
                       )}
                     </div>
-                    <div className="text-[11px] text-slate-500 mt-0.5 truncate">{u.user_id}</div>
+                    <div className="text-[11px] text-slate-500 mt-0.5 truncate">{u.email}</div>
                   </div>
 
                   {/* Role Badge */}
@@ -156,7 +161,7 @@ export function UserManagement() {
 
                   {/* Toggle Button */}
                   <button
-                    onClick={() => handleToggleRole(u)}
+                    onClick={(e) => { e.stopPropagation(); handleToggleRole(u); }}
                     disabled={isCurrentUser || isUpdating}
                     className={cn(
                       'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all active:scale-95 shrink-0',
