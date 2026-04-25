@@ -57,10 +57,11 @@ graph TD
 
 ## 🚀 Funcionalidades Principais (v1.2.0)
 
-### 👥 Gestão de Equipa & Impersonação (Novo)
-- **Modo Espião (Admin)**: Visualize o dashboard individual de qualquer colaborador com um clique, permitindo auditoria de prazos e carga de trabalho em tempo real.
-- **Identidade Real**: Interface totalmente limpa de identificadores técnicos; nomes reais são utilizados em toda a aplicação.
-- **Atribuição Inteligente**: Admins podem criar e atribuir obras diretamente a membros específicos da equipa.
+### 👥 Gestão de Equipa & Impersonação (v1.2.0)
+- **Modo Espião (Admin)**: Visualize o dashboard individual de qualquer colaborador com um clique.
+- **Identidade Real**: Interface totalmente limpa de identificadores técnicos; nomes reais em toda a aplicação.
+- **Atribuição Inteligente**: Admins podem criar e atribuir obras diretamente a membros específicos.
+- **UI/UX Premium**: Otimização de tipografia para maior densidade de informação e novos seletores customizados.
 
 ### 📁 Centralização de Repositórios BIM
 - **Cloud Connect**: Suporte para URLs de repositório (BIM, SharePoint) ao nível do projeto com atalhos de acesso rápido na barra lateral.

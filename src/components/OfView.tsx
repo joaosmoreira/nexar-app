@@ -92,10 +92,10 @@ function SortableTask({ tarefa, onToggle, onDelete, onRenameSubmit }: SortableTa
             onChange={e => setEditValue(e.target.value)}
             onKeyDown={handleKeyDown}
             onBlur={submitEdit}
-            className="w-full bg-slate-800 border border-sky-500/60 text-slate-100 rounded-lg px-3 py-1.5 text-base focus:outline-none focus:ring-1 focus:ring-sky-500 pointer-events-auto"
+            className="w-full bg-slate-800 border border-sky-500/60 text-slate-100 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-sky-500 pointer-events-auto"
           />
         ) : (
-          <span className={cn('text-base transition-all break-words', tarefa.concluido ? 'text-emerald-500/70 line-through' : 'text-slate-200')}>
+          <span className={cn('text-sm transition-all break-words', tarefa.concluido ? 'text-emerald-500/70 line-through' : 'text-slate-200')}>
             {tarefa.nome_tarefa}
           </span>
         )}
@@ -358,8 +358,8 @@ export function OfView({ ofId }: { ofId: number }) {
         </div>
         <div className="flex justify-between items-start">
           <div className="flex items-center gap-3 group/title flex-1 mr-4"><Settings2 className="text-sky-500 shrink-0" />
-            {editingOfName ? <input ref={ofNameInputRef} type="text" value={editOfValue} onChange={e => setEditOfValue(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') submitOfName(); if (e.key === 'Escape') setEditingOfName(false); }} onBlur={submitOfName} className="flex-1 bg-slate-800 border border-sky-500/60 text-slate-100 text-2xl font-bold rounded-lg px-3 py-1 focus:outline-none focus:ring-1 focus:ring-sky-500" />
-            : <div className="flex items-center gap-2"><h2 className="text-3xl font-bold text-slate-100">{ofData.nome_of}</h2><button onClick={startEditOfName} className="opacity-0 group-hover/title:opacity-100 p-1.5 rounded-lg text-slate-500 hover:text-sky-400 hover:bg-sky-500/10 active:scale-90 transition-all"><Pencil size={16} /></button></div>}
+            {editingOfName ? <input ref={ofNameInputRef} type="text" value={editOfValue} onChange={e => setEditOfValue(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') submitOfName(); if (e.key === 'Escape') setEditingOfName(false); }} onBlur={submitOfName} className="flex-1 bg-slate-800 border border-sky-500/60 text-slate-100 text-xl font-bold rounded-lg px-3 py-1 focus:outline-none focus:ring-1 focus:ring-sky-500" />
+            : <div className="flex items-center gap-2"><h2 className="text-2xl font-bold text-slate-100">{ofData.nome_of}</h2><button onClick={startEditOfName} className="opacity-0 group-hover/title:opacity-100 p-1.5 rounded-lg text-slate-500 hover:text-sky-400 hover:bg-sky-500/10 active:scale-90 transition-all"><Pencil size={16} /></button></div>}
           </div>
           <div className="flex gap-2 shrink-0">
             <button onClick={() => { setDeleteModalOpen(true); setDeleteInputName(''); }} className="flex items-center gap-2 px-3 py-2 bg-red-600/10 text-red-500 hover:bg-red-600/20 text-sm font-medium rounded-lg transition-all border border-red-500/20"><Trash2 size={16} /> Apagar</button>
@@ -376,7 +376,7 @@ export function OfView({ ofId }: { ofId: number }) {
 
       <div className="flex gap-4 mb-8 items-stretch">
         <div className="flex-1 bg-slate-800/50 border border-slate-700 p-6 rounded-2xl">
-          <div className="flex justify-between items-end mb-3"><div className="text-sm font-medium text-slate-300">Progresso Operacional</div><div className="text-xl font-bold text-sky-400">{progresso}%</div></div>
+          <div className="flex justify-between items-end mb-3"><div className="text-sm font-medium text-slate-300">Progresso Operacional</div><div className="text-lg font-bold text-sky-400">{progresso}%</div></div>
           <div className="w-full bg-slate-900 rounded-full h-3 border border-slate-700 flex items-center overflow-hidden"><div className="h-full bg-gradient-to-r from-sky-500 to-sky-400 transition-all duration-1000 ease-out" style={{ width: `${progresso}%` }} /></div>
         </div>
         <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-5 flex flex-col justify-between min-w-[200px] max-w-[240px] shrink-0">
@@ -390,12 +390,12 @@ export function OfView({ ofId }: { ofId: number }) {
 
 
       <div className="space-y-3 max-w-4xl">
-        <div className="flex items-center justify-between mb-4 px-1"><h3 className="text-lg font-medium text-slate-200">Checklist de Tarefas</h3><span className="text-xs text-slate-500 flex items-center gap-1.5"><GripVertical size={12} /> Arrasta para reordenar</span></div>
+        <div className="flex items-center justify-between mb-4 px-1"><h3 className="text-base font-medium text-slate-200">Checklist de Tarefas</h3><span className="text-xs text-slate-500 flex items-center gap-1.5"><GripVertical size={12} /> Arrasta para reordenar</span></div>
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <SortableContext items={tarefas.map(t => t.id)} strategy={verticalListSortingStrategy}>
             <div className="space-y-2">{tarefas.map(tarefa => (<SortableTask key={tarefa.id} tarefa={tarefa} onToggle={handleToggle} onDelete={handleDeleteTarefa} onRenameSubmit={handleRenameTask} />))}</div>
           </SortableContext>
-          <DragOverlay>{activeTarefa ? (<div className="flex items-center gap-3 p-4 rounded-xl border border-sky-500/50 bg-slate-800 shadow-2xl opacity-95"><GripVertical size={18} className="text-sky-400" /><Circle className="text-slate-500 w-6 h-6 shrink-0" /><span className="text-base text-slate-200 flex-1">{activeTarefa.nome_tarefa}</span></div>) : null}</DragOverlay>
+          <DragOverlay>{activeTarefa ? (<div className="flex items-center gap-3 p-4 rounded-xl border border-sky-500/50 bg-slate-800 shadow-2xl opacity-95"><GripVertical size={18} className="text-sky-400" /><Circle className="text-slate-500 w-6 h-6 shrink-0" /><span className="text-sm text-slate-200 flex-1">{activeTarefa.nome_tarefa}</span></div>) : null}</DragOverlay>
         </DndContext>
         {tarefas.length === 0 && <div className="p-8 text-center bg-slate-900 rounded-xl border border-slate-800 text-slate-500">Sem tarefas.</div>}
         <button onClick={() => setModalOpen(true)} className="mt-4 w-full flex items-center justify-center gap-2 p-3 rounded-xl border border-dashed border-slate-700 text-slate-400 hover:text-sky-400 hover:border-sky-500/50 active:scale-[0.98] transition-all"><Plus size={18} /><span>Adicionar Tarefa</span></button>

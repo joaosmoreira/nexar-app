@@ -100,7 +100,7 @@ export function GlobalDashboard() {
            {isArchiveMode ? <Archive size={24} /> : <LayoutGrid size={24} />}
         </div>
         <div>
-           <h1 className="text-3xl font-bold text-slate-100">
+           <h1 className="text-2xl font-bold text-slate-100">
              {isArchiveMode ? "Arquivo de Obras" : "Dashboard de Obras"}
            </h1>
            <p className="text-slate-400 mt-1">
@@ -176,7 +176,7 @@ export function GlobalDashboard() {
       {metrics.length === 0 ? (
         <div className="flex flex-col items-center justify-center p-16 text-slate-500 border border-slate-800 rounded-2xl bg-slate-800/20 border-dashed">
            <Factory size={48} className="mb-4 opacity-50" />
-           <span className="text-lg font-medium">Nenhum projeto encontrado.</span>
+           <span className="text-base font-medium">Nenhum projeto encontrado.</span>
         </div>
       ) : (
         <div ref={gridParent as any} className="grid gap-6" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(max(280px, calc(33.333% - 16px)), 1fr))' }}>
@@ -212,7 +212,7 @@ export function GlobalDashboard() {
                        <div className="text-xs font-bold tracking-widest uppercase text-sky-500/70 mb-1" title={ref}>
                           {ref}
                        </div>
-                       <h2 className="text-xl font-bold text-slate-200 group-hover:text-white transition-colors line-clamp-2 leading-snug min-h-[3.5rem]" title={projNameOnly}>
+                       <h2 className="text-lg font-bold text-slate-200 group-hover:text-white transition-colors line-clamp-2 leading-snug min-h-[3rem]" title={projNameOnly}>
                           {projNameOnly}
                        </h2>
                     </div>
@@ -229,11 +229,11 @@ export function GlobalDashboard() {
                     <div className="flex gap-4">
                        <div className="flex-1 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3">
                          <div className="text-xs text-amber-500/80 mb-1 font-medium">Abertas</div>
-                         <div className="text-2xl font-light text-amber-400">{abertas}</div>
+                         <div className="text-xl font-light text-amber-400">{abertas}</div>
                        </div>
                        <div className="flex-1 bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3">
                          <div className="text-xs text-emerald-500/80 mb-1 font-medium">Terminadas</div>
-                         <div className="text-2xl font-light text-emerald-400">{concluido}</div>
+                         <div className="text-xl font-light text-emerald-400">{concluido}</div>
                        </div>
                     </div>
                  </div>

@@ -241,7 +241,7 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
       <div className="flex justify-between items-start mb-8">
         <div>
           <div className="text-xs text-sky-400 font-medium tracking-widest uppercase mb-2">DETALHES DO PROJETO {projeto.arquivado && <span className="text-amber-500 ml-2">(ARQUIVADO)</span>}</div>
-          <h2 className="text-3xl font-bold text-slate-100 flex items-center gap-3">{projeto.nome}</h2>
+          <h2 className="text-2xl font-bold text-slate-100 flex items-center gap-3">{projeto.nome}</h2>
           <div className="text-slate-400 mt-1">Cliente: <span className="text-slate-300">{projeto.cliente}</span></div>
         </div>
         <div className="flex gap-2">
@@ -261,11 +261,11 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
       <div className="grid gap-6 mb-8" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(max(250px, calc(33.333% - 16px)), 1fr))' }}>
         <div className="bg-slate-800/50 border border-slate-700 p-5 rounded-2xl">
           <div className="text-sm text-slate-400 mb-1">Total de OFs</div>
-          <div className="text-3xl font-light text-slate-100">{ofs.length}</div>
+          <div className="text-2xl font-light text-slate-100">{ofs.length}</div>
         </div>
         <div className="bg-slate-800/50 border border-slate-700 p-5 rounded-2xl">
           <div className="text-sm text-slate-400 mb-1">OFs Concluídas</div>
-          <div className="text-3xl font-light text-sky-400">{ofs.filter(o => o.progress === 100).length}</div>
+          <div className="text-2xl font-light text-sky-400">{ofs.filter(o => o.progress === 100).length}</div>
         </div>
         
         {/* Pasta da Obra (Cloud) */}
@@ -311,7 +311,7 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
 
       <div className="bg-slate-800/30 border border-slate-700 rounded-2xl overflow-hidden">
         <div className="p-5 border-b border-slate-700/50 flex justify-between items-center bg-slate-800/50">
-          <h3 className="text-lg font-medium text-slate-200">Ordens de Fabrico</h3>
+          <h3 className="text-base font-medium text-slate-200">Ordens de Fabrico</h3>
           {!projeto.arquivado && <button onClick={openNewOfModal} disabled={creating} className="flex items-center gap-2 px-4 py-2 bg-sky-600 hover:bg-sky-500 active:scale-95 text-white text-sm font-medium rounded-lg transition-all disabled:opacity-50"><PlusCircle size={16} /> Nova OF</button>}
         </div>
         {ofs.length === 0 ? <div className="p-12 text-center text-slate-500">Nenhuma Ordem de Fabrico registada.</div> : (

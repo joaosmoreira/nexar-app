@@ -4,7 +4,7 @@ import {
   createProjeto, reorderProjetos,
   Projeto, UserWithRole 
 } from '../services/api';
-import { Layers, Plus, Archive, Search, LogOut, User, Users, Wifi, WifiOff, RefreshCw, KeyRound, Folder } from 'lucide-react';
+import { Layers, Plus, Archive, Search, LogOut, User, Users, Wifi, WifiOff, RefreshCw, KeyRound, Folder, ChevronDown } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { cn } from '../lib/utils';
 import { Modal } from './Modal';
@@ -253,17 +253,22 @@ export function Sidebar() {
           {isAdmin && (isUserMgmtOpen || viewingUserId) && (
             <div>
               <label className="block text-sm font-medium text-slate-400 mb-1">Atribuir a Utilizador</label>
-              <select
-                value={targetUserId}
-                onChange={e => setTargetUserId(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 text-slate-200 rounded-lg p-2.5 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none transition-all"
-              >
-                {allUsers.map(u => (
-                  <option key={u.user_id} value={u.user_id}>
-                    {u.nome || u.email}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <select
+                  value={targetUserId}
+                  onChange={e => setTargetUserId(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 text-slate-200 rounded-lg p-2.5 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none transition-all appearance-none pr-10 cursor-pointer"
+                >
+                  {allUsers.map(u => (
+                    <option key={u.user_id} value={u.user_id} className="bg-slate-900">
+                      {u.nome || u.email.split('@')[0]} ({u.role})
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
+                  <ChevronDown size={16} />
+                </div>
+              </div>
             </div>
           )}
           <button type="submit" className="mt-2 w-full bg-sky-500 hover:bg-sky-400 active:scale-95 text-white font-medium rounded-lg p-3 transition-all duration-150">
