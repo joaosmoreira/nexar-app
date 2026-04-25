@@ -35,7 +35,10 @@ jobs:
         shell: bash
         run: |
           VERSION=$(node -p "require('./package.json').version")
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "app_version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Type Check
+        run: npx tsc --noEmit
 
       - name: Build Tauri App
         uses: tauri-apps/tauri-action@v0
@@ -44,8 +47,8 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         with:
-          tagName: v${{ env.VERSION }}
-          releaseName: 'Nexar HUB v${{ env.VERSION }}'
+          tagName: v${{ steps.get_version.outputs.app_version }}
+          releaseName: 'Nexar HUB v${{ steps.get_version.outputs.app_version }}'
           releaseBody: 'Nova versão do Nexar HUB Work Manager. Inclui otimizações de performance e correções estruturais.'
           releaseDraft: true # Criar como Rascunho para permitir upload manual do Mac
           prerelease: false
@@ -54,7 +57,7 @@ jobs:
       - name: Upload Windows Artifacts to Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ env.VERSION }}
+          tag_name: v${{ steps.get_version.outputs.app_version }}
           draft: true
           files: |
             src-tauri/target/release/bundle/msi/*.msi

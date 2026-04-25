@@ -22,7 +22,7 @@ import { flushPendingMutations } from "./services/offlineCache";
 import { Auth } from "./components/Auth";
 import { PasswordReset } from "./components/PasswordReset";
 import { supabase } from "./supabaseClient";
-
+import { ErrorBoundary } from "react-error-boundary";
 // Carregamento Preguiçoso (Code-Splitting)
 const GlobalDashboard = lazy(() => import("./components/GlobalDashboard").then(m => ({ default: m.GlobalDashboard })));
 const ProjectView = lazy(() => import("./components/ProjectView").then(m => ({ default: m.ProjectView })));
@@ -36,6 +36,24 @@ function LoadingScreen() {
         <div className="w-8 h-8 border-2 border-sky-500/30 border-t-sky-500 rounded-full animate-spin"></div>
         <span className="text-xs text-slate-500 font-medium tracking-widest uppercase">A carregar vista...</span>
       </div>
+    </div>
+  );
+}
+
+function ErrorFallback({ error, resetErrorBoundary }: any) {
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center bg-slate-900 p-8 text-center h-full z-50">
+      <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mb-4">
+        <span className="text-red-500 text-2xl">⚠️</span>
+      </div>
+      <h2 className="text-lg font-semibold text-slate-100 mb-2">Ups, algo correu mal a carregar a página!</h2>
+      <p className="text-sm text-slate-400 max-w-md mb-6">{error?.message || "Ocorreu um erro inesperado."}</p>
+      <button
+        onClick={resetErrorBoundary}
+        className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium transition-colors"
+      >
+        Tentar novamente
+      </button>
     </div>
   );
 }
@@ -215,18 +233,20 @@ function App() {
       <main className="flex-1 bg-slate-900 border-l border-t border-slate-800 shadow-2xl overflow-hidden relative">
         <GlobalSearchModal />
 
-        <Suspense fallback={<LoadingScreen />}>
-          {/* Dynamic routing based on Zustand state */}
-          {selectedOfId && <OfView ofId={selectedOfId} />}
+        <ErrorBoundary FallbackComponent={ErrorFallback} onReset={() => window.location.reload()}>
+          <Suspense fallback={<LoadingScreen />}>
+            {/* Dynamic routing based on Zustand state */}
+            {selectedOfId && <OfView ofId={selectedOfId} />}
 
-          {!selectedOfId && selectedProjectId && (
-            <ProjectView projetoId={selectedProjectId} />
-          )}
+            {!selectedOfId && selectedProjectId && (
+              <ProjectView projetoId={selectedProjectId} />
+            )}
 
-          {!selectedOfId && !selectedProjectId && isUserMgmtOpen && <UserManagement />}
+            {!selectedOfId && !selectedProjectId && isUserMgmtOpen && <UserManagement />}
 
-          {!selectedOfId && !selectedProjectId && !isUserMgmtOpen && <GlobalDashboard />}
-        </Suspense>
+            {!selectedOfId && !selectedProjectId && !isUserMgmtOpen && <GlobalDashboard />}
+          </Suspense>
+        </ErrorBoundary>
       </main>
     </div>
   );

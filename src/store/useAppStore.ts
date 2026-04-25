@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { Session, User } from '@supabase/supabase-js';
 import { UserRole, Projeto, OrdemFabrico } from '../services/api';
 
@@ -52,7 +53,9 @@ interface AppState {
   incrementDataVersion: () => void;
 }
 
-export const useAppStore = create<AppState>((set) => ({
+export const useAppStore = create<AppState>()(
+  persist(
+    (set) => ({
   user: null,
   session: null,
   selectedProjectId: null,
@@ -99,4 +102,15 @@ export const useAppStore = create<AppState>((set) => ({
   setLastSyncAt: (ts) => set({ lastSyncAt: ts }),
   setPendingMutations: (has) => set({ hasPendingMutations: has }),
   incrementDataVersion: () => set((state) => ({ dataVersion: state.dataVersion + 1 })),
-}));
+    }),
+    {
+      name: 'nexar-app-storage',
+      partialize: (state) => ({
+        projects: state.projects,
+        ofs: state.ofs,
+        dataVersion: state.dataVersion,
+        lastSyncAt: state.lastSyncAt,
+      }),
+    }
+  )
+);
