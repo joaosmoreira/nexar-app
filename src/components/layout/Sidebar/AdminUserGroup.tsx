@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { ChevronRight } from 'lucide-react';
-import { useAppStore } from '../../store/useAppStore';
-import { Projeto, UserWithRole } from '../../services/api';
-import { cn } from '../../lib/utils';
+import { useAppStore } from '@/store/useAppStore';
+import { Projeto, UserWithRole } from '@/services/api';
+import { cn } from '@/lib/utils';
 import { ProjectItem } from './ProjectItem';
 
 interface AdminUserGroupProps {

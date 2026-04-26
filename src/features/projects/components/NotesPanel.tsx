@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StickyNote, Save, CheckCircle2 } from 'lucide-react';
+import { Save, StickyNote, CheckCircle2 } from 'lucide-react';
+
 
 interface NotesPanelProps {
   value: string;

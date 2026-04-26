@@ -4,12 +4,12 @@ import {
   deleteOrdemFabrico, updateProjectoUltimoMovimento,
   updateOrdemFabrico, updateTarefa, deleteTarefa, reorderTarefas,
   Tarefa,
-} from '../services/api';
-import { exportToExcel, exportToJson } from '../lib/exportUtils';
+} from '@/services/api';
+import { exportToExcel, exportToJson } from '@/lib/exportUtils';
 import { FileDown, CheckCircle2, Circle, Settings2, Plus, Trash2, Pencil, GripVertical, Check, X, CalendarClock, AlertTriangle, Link as LinkIcon, ExternalLink } from 'lucide-react';
-import { useAppStore } from '../store/useAppStore';
-import { cn } from '../lib/utils';
-import { Modal } from './Modal';
+import { useAppStore } from '@/store/useAppStore';
+import { cn } from '@/lib/utils';
+import { Modal } from '@/components/common/Modal';
 import { toast } from 'sonner';
 import {
   DndContext, closestCenter, PointerSensor, useSensor, useSensors,
@@ -19,7 +19,7 @@ import {
   arrayMove, SortableContext, useSortable, verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { useOfData } from '../hooks/useOfData';
+import { useOfData } from '@/hooks/useOfData';
 import { NotesPanel } from './NotesPanel';
 
 // ─── Sortable Task Row ─────────────────────────────────────────────────────────

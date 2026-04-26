@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Search, Folder, FileText, X } from 'lucide-react';
-import { useAppStore } from '../store/useAppStore';
-import { globalSearch } from '../services/api';
+import { useAppStore } from '@/store/useAppStore';
+import { globalSearch } from '@/services/api';
 
 export function GlobalSearchModal() {
   const { isSearchOpen, setSearchOpen, setSelectedProject, setSelectedOf } = useAppStore();

@@ -1,7 +1,7 @@
 import { FileCog, AlertTriangle, CheckCircle2 } from 'lucide-react';
-import { useAppStore } from '../../store/useAppStore';
-import { cn } from '../../lib/utils';
-import { OrdemFabrico } from '../../services/api';
+import { useAppStore } from '@/store/useAppStore';
+import { cn } from '@/lib/utils';
+import { OrdemFabrico } from '@/services/api';
 
 interface OfItemProps {
   ofData: OrdemFabrico;

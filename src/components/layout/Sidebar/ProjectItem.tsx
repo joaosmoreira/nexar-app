@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Folder, AlertTriangle, CheckCircle2, ExternalLink } from 'lucide-react';
-import { useAppStore } from '../../store/useAppStore';
-import { fetchOfsByProjeto, Projeto, OrdemFabrico } from '../../services/api';
-import { cn } from '../../lib/utils';
+import { useAppStore } from '@/store/useAppStore';
+import { fetchOfsByProjeto, Projeto, OrdemFabrico } from '@/services/api';
+import { cn } from '@/lib/utils';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { OfItem } from './OfItem';

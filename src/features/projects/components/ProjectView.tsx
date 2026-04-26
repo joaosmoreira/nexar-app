@@ -2,16 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { 
   createOF, deleteProjeto, arquivarProjeto, 
   fetchNextGs0000OfNumber
-} from '../services/api';
-import { exportToJson, exportProjectExcelWithTasks } from '../lib/exportUtils';
+} from '@/services/api';
+import { exportToJson, exportProjectExcelWithTasks } from '@/lib/exportUtils';
 import { FileDown, PlusCircle, Archive, Trash2, CalendarClock, StickyNote, ExternalLink, Layers } from 'lucide-react';
-import { useAppStore } from '../store/useAppStore';
-import { cn } from '../lib/utils';
-import { Modal } from './Modal';
+import { useAppStore } from '@/store/useAppStore';
+import { cn } from '@/lib/utils';
+import { Modal } from '@/components/common/Modal';
 import { toast } from 'sonner';
-import { useProjectData } from '../hooks/useProjectData';
+import { useProjectData } from '@/hooks/useProjectData';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
-import { updateProjeto } from '../services/api';
+import { updateProjeto } from '@/services/api';
 
 export function ProjectView({ projetoId }: { projetoId: number }) {
   const { 

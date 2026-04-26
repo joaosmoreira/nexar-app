@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { supabase } from '../supabaseClient';
-import { useAppStore } from '../store/useAppStore';
-import { KeyRound, Loader2, CheckCircle2 } from 'lucide-react';
+import { supabase } from '@/supabaseClient';
+import { useAppStore } from '@/store/useAppStore';
+import { Loader2, CheckCircle2, KeyRound } from 'lucide-react';
 
 /**
  * Ecra de reset de password — aparece quando o utilizador

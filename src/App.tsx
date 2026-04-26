@@ -1,9 +1,9 @@
 
 import { useEffect, useState, lazy, Suspense } from "react";
 import "./App.css";
-import { Sidebar } from "./components/Sidebar";
-import { GlobalSearchModal } from "./components/GlobalSearchModal";
-import { useAppStore } from "./store/useAppStore";
+import { Sidebar } from "@/components/layout/Sidebar";
+import { GlobalSearchModal } from "@/components/common/GlobalSearchModal";
+import { useAppStore } from "@/store/useAppStore";
 import {
   runAutoArchive,
   getPendingCount,
@@ -17,17 +17,17 @@ import {
   createTarefaRemote,
   updateProjectoUltimoMovimentoRemote,
   reorderProjetosRemote,
-} from "./services/api";
-import { flushPendingMutations } from "./services/offlineCache";
-import { Auth } from "./components/Auth";
-import { PasswordReset } from "./components/PasswordReset";
-import { supabase } from "./supabaseClient";
+} from "@/services/api";
+import { flushPendingMutations } from "@/services/offlineCache";
+import { Auth } from "@/features/auth/components/Auth";
+import { PasswordReset } from "@/features/admin/components/PasswordReset";
+import { supabase } from "@/supabaseClient";
 import { ErrorBoundary } from "react-error-boundary";
 // Carregamento Preguiçoso (Code-Splitting)
-const GlobalDashboard = lazy(() => import("./components/GlobalDashboard").then(m => ({ default: m.GlobalDashboard })));
-const ProjectView = lazy(() => import("./components/ProjectView").then(m => ({ default: m.ProjectView })));
-const OfView = lazy(() => import("./components/OfView").then(m => ({ default: m.OfView })));
-const UserManagement = lazy(() => import("./components/UserManagement").then(m => ({ default: m.UserManagement })));
+const GlobalDashboard = lazy(() => import("@/features/projects/components/GlobalDashboard").then(m => ({ default: m.GlobalDashboard })));
+const ProjectView = lazy(() => import("@/features/projects/components/ProjectView").then(m => ({ default: m.ProjectView })));
+const OfView = lazy(() => import("@/features/projects/components/OfView").then(m => ({ default: m.OfView })));
+const UserManagement = lazy(() => import("@/features/admin/components/UserManagement").then(m => ({ default: m.UserManagement })));
 
 function LoadingScreen() {
   return (

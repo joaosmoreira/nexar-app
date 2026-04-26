@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { fetchDashboardMetrics, fetchAlertOFs } from '../services/api';
-import { useAppStore } from '../store/useAppStore';
+import { fetchDashboardMetrics, fetchAlertOFs } from '@/services/api';
+import { useAppStore } from '@/store/useAppStore';
 import { LayoutGrid, Layers, Archive, Factory, AlertTriangle, Clock, CalendarClock } from 'lucide-react';
-import { cn } from '../lib/utils';
+import { cn } from '@/lib/utils';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 
 // Helper para navegar directamente para uma OF (define projecto + OF)

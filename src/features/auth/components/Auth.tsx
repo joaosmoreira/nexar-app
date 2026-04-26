@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { supabase } from '../supabaseClient';
-import { Lock, Mail, Loader2, ArrowRight, ArrowLeft, KeyRound, User } from 'lucide-react';
+import { supabase } from '@/supabaseClient';
+import { Mail, Lock, User, ArrowRight, Loader2, KeyRound, ArrowLeft } from 'lucide-react';
 
 type AuthMode = 'login' | 'register' | 'recovery';
 

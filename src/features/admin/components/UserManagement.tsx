@@ -1,8 +1,15 @@
 import { useEffect, useState } from 'react';
-import { fetchAllUsers, updateUserRole, UserWithRole, UserRole } from '../services/api';
-import { useAppStore } from '../store/useAppStore';
-import { Users, ShieldCheck, ShieldOff, RefreshCw, X } from 'lucide-react';
-import { cn } from '../lib/utils';
+import { 
+  fetchAllUsers, 
+  updateUserRole, 
+  UserWithRole,
+  UserRole
+} from '@/services/api';
+import { 
+  Users, ShieldCheck, ShieldOff, RefreshCw, X 
+} from 'lucide-react';
+import { useAppStore } from '@/store/useAppStore';
+import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
 export function UserManagement() {

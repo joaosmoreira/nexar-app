@@ -1,13 +1,13 @@
 import { useEffect, useState, useMemo } from 'react';
-import { useAppStore } from '../store/useAppStore';
+import { useAppStore } from '@/store/useAppStore';
 import { 
   createProjeto, reorderProjetos,
   Projeto, UserWithRole 
-} from '../services/api';
+} from '@/services/api';
 import { Layers, Plus, Archive, Search, LogOut, User, Users, Wifi, WifiOff, RefreshCw, KeyRound, Folder, ChevronDown } from 'lucide-react';
-import { supabase } from '../supabaseClient';
-import { cn } from '../lib/utils';
-import { Modal } from './Modal';
+import { supabase } from '@/supabaseClient';
+import { cn } from '@/lib/utils';
+import { Modal } from '@/components/common/Modal';
 import { toast } from 'sonner';
 import {
   DndContext, closestCenter, PointerSensor, useSensor, useSensors,
@@ -17,7 +17,7 @@ import {
   arrayMove, SortableContext, verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 
-import { useSidebarData } from '../hooks/useSidebarData';
+import { useSidebarData } from '@/hooks/useSidebarData';
 import { ProjectItem } from './Sidebar/ProjectItem';
 import { AdminUserGroup } from './Sidebar/AdminUserGroup';
 
