@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { 
   createOF, deleteProjeto, arquivarProjeto, 
-  fetchNextGs0000OfNumber
+  fetchNextGs0000OfNumber, updateOrdemFabrico
 } from '@/services/api';
 import { exportToJson, exportProjectExcelWithTasks } from '@/lib/exportUtils';
-import { FileDown, PlusCircle, Archive, Trash2, CalendarClock, StickyNote, ExternalLink, Layers } from 'lucide-react';
+import { FileDown, PlusCircle, Archive, Trash2, CalendarClock, StickyNote, ExternalLink, Layers, Flag, Pencil } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { cn } from '@/lib/utils';
 import { Modal } from '@/components/common/Modal';
@@ -32,6 +32,13 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
 
   const [editingCloudLink, setEditingCloudLink] = useState(false);
   const [tempCloudLink, setTempCloudLink] = useState("");
+
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editingOf, setEditingOf] = useState<any>(null);
+  const [editOfName, setEditOfName] = useState("");
+  const [editOfNumber, setEditOfNumber] = useState("");
+  const [editOfPrazo, setEditOfPrazo] = useState("");
+  const [updating, setUpdating] = useState(false);
 
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deleteInputName, setDeleteInputName] = useState("");
@@ -86,6 +93,37 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
       toast.error("Erro ao criar: " + e.message);
     } finally {
       setCreating(false);
+    }
+  };
+
+  const handleOpenEditOf = (of: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingOf(of);
+    setEditOfName(of.nome_of);
+    setEditOfNumber(of.numero_of);
+    setEditOfPrazo(of.prazo_limite ? new Date(of.prazo_limite).toISOString().split('T')[0] : "");
+    setEditModalOpen(true);
+  };
+
+  const submitEditOf = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingOf || !editOfName || !editOfNumber) return;
+    try {
+      setUpdating(true);
+      const prazoIso = editOfPrazo ? new Date(editOfPrazo).toISOString() : null;
+      await updateOrdemFabrico(editingOf.id, {
+        nome_of: editOfName,
+        numero_of: editOfNumber,
+        prazo_limite: prazoIso
+      });
+      await loadData();
+      setEditModalOpen(false);
+      useAppStore.getState().incrementDataVersion();
+      toast.success("Ordem de fabrico atualizada!");
+    } catch (e: any) {
+      toast.error("Erro ao atualizar: " + e.message);
+    } finally {
+      setUpdating(false);
     }
   };
 
@@ -190,6 +228,27 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
             <input autoFocus type="text" required value={deleteInputName} onChange={e => setDeleteInputName(e.target.value)} placeholder="Nome da Obra Mestre" className="w-full bg-slate-950 border border-red-900/50 text-slate-200 rounded-lg p-2.5 focus:border-red-500 focus:ring-1 focus:ring-red-500 outline-none transition-all" />
           </div>
           <button type="submit" className="mt-2 w-full bg-red-600 hover:bg-red-500 active:scale-95 text-white font-medium rounded-lg p-3 transition-all">Confirmar Eliminação Global</button>
+        </form>
+      </Modal>
+
+      <Modal isOpen={editModalOpen} title="Editar Ordem de Fabrico" onClose={() => setEditModalOpen(false)}>
+        <form onSubmit={submitEditOf} className="flex flex-col gap-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-400 mb-1">Número da OF</label>
+            <input autoFocus type="text" required value={editOfNumber} onChange={e => setEditOfNumber(e.target.value)} placeholder="ex: 2026XXXX" className="w-full bg-slate-950 border border-slate-800 text-slate-200 rounded-lg p-2.5 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none transition-all" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-400 mb-1">Nome/Descrição da OF</label>
+            <input type="text" required value={editOfName} onChange={e => setEditOfName(e.target.value)} placeholder="ex: Produção Cadeira XPTO" className="w-full bg-slate-950 border border-slate-800 text-slate-200 rounded-lg p-2.5 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none transition-all" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-400 mb-1">Prazo Limite <span className="text-slate-600 font-normal">(Opcional)</span></label>
+            <div className="relative">
+              <CalendarClock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+              <input type="date" value={editOfPrazo} onChange={e => setEditOfPrazo(e.target.value)} className="w-full bg-slate-950 border border-slate-800 text-slate-200 rounded-lg pl-9 pr-3 py-2.5 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none transition-all" />
+            </div>
+          </div>
+          <button disabled={updating} type="submit" className="mt-2 w-full bg-sky-500 hover:bg-sky-400 active:scale-95 text-white font-medium rounded-lg p-3 transition-all disabled:opacity-50">{updating ? "A Atualizar..." : "Guardar Alterações"}</button>
         </form>
       </Modal>
 
@@ -324,7 +383,12 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
                 const prazo = formatPrazo(of.prazo_limite);
                 return (
                   <tr key={of.id} onClick={() => useAppStore.getState().setSelectedOf(of.id)} className="hover:bg-slate-800/80 transition-colors cursor-pointer group">
-                    <td className="px-4 py-3 font-mono text-sky-400">{of.numero_of}</td>
+                    <td className="px-4 py-3 font-mono text-sky-400 flex items-center gap-2">
+                      {of.numero_of}
+                      {of.external_source === 'outlook' && (
+                        <Flag size={12} fill="currentColor" className="text-amber-500" title="Vindo do Outlook" />
+                      )}
+                    </td>
                     <td className="px-4 py-3 font-medium text-slate-200">{of.nome_of}</td>
                     <td className="px-4 py-3">{prazo ? <div className={cn("flex items-center gap-1.5", prazo.color)}><CalendarClock size={13} /><span>{prazo.label}</span></div> : "—"}</td>
                     <td className="px-4 py-3 w-56"><div className="flex items-center gap-3"><div className="w-full bg-slate-700 rounded-full h-1.5 flex-1 overflow-hidden"><div className={cn("h-1.5 rounded-full transition-all duration-500", of.progress === 100 ? "bg-emerald-400" : "bg-sky-500")} style={{ width: `${of.progress}%` }}></div></div><span className="text-xs font-medium text-slate-400 w-8">{of.progress}%</span></div></td>
@@ -342,6 +406,13 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
                             <ExternalLink size={16} />
                           </a>
                         )}
+                        <button 
+                          onClick={(e) => handleOpenEditOf(of, e)} 
+                          className="text-slate-500 hover:text-sky-400 p-1 hover:bg-sky-500/10 rounded transition-all"
+                          title="Editar OF"
+                        >
+                          <Pencil size={16} />
+                        </button>
                         <button className="text-sky-500 group-hover:text-sky-300 font-medium">Abrir</button>
                       </div>
                     </td>
@@ -376,7 +447,18 @@ export function ProjectView({ projetoId }: { projetoId: number }) {
                     <span className="font-mono text-[11px] text-sky-400 font-semibold bg-sky-500/10 px-1.5 py-0.5 rounded">{o.numero_of}</span>
                     <span className="text-[11px] text-slate-400 truncate ml-2 text-right">{o.nome_of}</span>
                   </div>
-                  <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap group-hover:text-slate-200 transition-colors">{o.notas}</p>
+                  {o.notas?.includes('[OUTLOOK_MSG]') ? (
+                    <div className="flex gap-2">
+                      <Flag size={12} className="text-amber-500 mt-1 shrink-0" fill="currentColor" />
+                      <p className="text-sm text-slate-400 leading-relaxed italic line-clamp-3 group-hover:text-slate-300 transition-colors">
+                        {o.notas.replace(/\[OUTLOOK_MSG\]/g, '').trim()}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap group-hover:text-slate-200 transition-colors line-clamp-4">
+                      {o.notas}
+                    </p>
+                  )}
                 </div>
               ))}
             </div>

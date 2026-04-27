@@ -23,6 +23,9 @@ export interface OrdemFabrico {
   notas?: string;
   anexo_url?: string | null;
   progress?: number;
+  external_source?: 'outlook' | null;
+  external_id?: string | null;
+  external_link?: string | null;
 }
 
 export interface Tarefa {
@@ -31,6 +34,9 @@ export interface Tarefa {
   nome_tarefa: string;
   concluido: boolean;
   ordem_index: number;
+  external_source?: 'outlook' | null;
+  external_id?: string | null;
+  external_link?: string | null;
 }
 
 export interface UserWithRole {

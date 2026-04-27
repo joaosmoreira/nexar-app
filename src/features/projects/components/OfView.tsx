@@ -3,10 +3,10 @@ import {
   toggleTarefaConcluida, createTarefa,
   deleteOrdemFabrico, updateProjectoUltimoMovimento,
   updateOrdemFabrico, updateTarefa, deleteTarefa, reorderTarefas,
-  Tarefa,
+  Tarefa, createStandardTasksRemote,
 } from '@/services/api';
 import { exportToExcel, exportToJson } from '@/lib/exportUtils';
-import { FileDown, CheckCircle2, Circle, Settings2, Plus, Trash2, Pencil, GripVertical, Check, X, CalendarClock, AlertTriangle, Link as LinkIcon, ExternalLink } from 'lucide-react';
+import { FileDown, CheckCircle2, Circle, Settings2, Plus, Trash2, Pencil, GripVertical, Check, X, CalendarClock, AlertTriangle, Link as LinkIcon, ExternalLink, Flag } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { cn } from '@/lib/utils';
 import { Modal } from '@/components/common/Modal';
@@ -95,9 +95,23 @@ function SortableTask({ tarefa, onToggle, onDelete, onRenameSubmit }: SortableTa
             className="w-full bg-slate-800 border border-sky-500/60 text-slate-100 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-sky-500 pointer-events-auto"
           />
         ) : (
-          <span className={cn('text-sm transition-all break-words', tarefa.concluido ? 'text-emerald-500/70 line-through' : 'text-slate-200')}>
-            {tarefa.nome_tarefa}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className={cn('text-sm transition-all break-words', tarefa.concluido ? 'text-emerald-500/70 line-through' : 'text-slate-200')}>
+              {tarefa.nome_tarefa}
+            </span>
+            {tarefa.external_source === 'outlook' && (
+              <a 
+                href={tarefa.external_link || '#'} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-blue-400 hover:text-blue-300 transition-colors shrink-0"
+                title="Ver email original"
+                onClick={e => e.stopPropagation()}
+              >
+                <Flag size={12} fill="currentColor" className="text-amber-500" />
+              </a>
+            )}
+          </div>
         )}
       </div>
 
@@ -359,9 +373,39 @@ export function OfView({ ofId }: { ofId: number }) {
         <div className="flex justify-between items-start">
           <div className="flex items-center gap-3 group/title flex-1 mr-4"><Settings2 className="text-sky-500 shrink-0" />
             {editingOfName ? <input ref={ofNameInputRef} type="text" value={editOfValue} onChange={e => setEditOfValue(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') submitOfName(); if (e.key === 'Escape') setEditingOfName(false); }} onBlur={submitOfName} className="flex-1 bg-slate-800 border border-sky-500/60 text-slate-100 text-xl font-bold rounded-lg px-3 py-1 focus:outline-none focus:ring-1 focus:ring-sky-500" />
-            : <div className="flex items-center gap-2"><h2 className="text-2xl font-bold text-slate-100">{ofData.nome_of}</h2><button onClick={startEditOfName} className="opacity-0 group-hover/title:opacity-100 p-1.5 rounded-lg text-slate-500 hover:text-sky-400 hover:bg-sky-500/10 active:scale-90 transition-all"><Pencil size={16} /></button></div>}
+            : <div className="flex items-center gap-2">
+                <h2 className="text-2xl font-bold text-slate-100">{ofData.nome_of}</h2>
+                {ofData.external_source === 'outlook' && (
+                  <a 
+                    href={ofData.external_link || '#'} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-amber-500 hover:text-amber-400 transition-colors bg-amber-500/10 p-2 rounded-lg"
+                    title="Ver email original"
+                  >
+                    <Flag size={18} fill="currentColor" />
+                  </a>
+                )}
+                <button onClick={startEditOfName} className="opacity-0 group-hover/title:opacity-100 p-1.5 rounded-lg text-slate-500 hover:text-sky-400 hover:bg-sky-500/10 active:scale-90 transition-all"><Pencil size={16} /></button>
+              </div>}
           </div>
           <div className="flex gap-2 shrink-0">
+            {(!ofData.tarefas || ofData.tarefas.length === 0) && (
+              <button 
+                onClick={async () => {
+                  try {
+                    await createStandardTasksRemote(ofId);
+                    useAppStore.getState().incrementDataVersion();
+                    toast.success("Tarefas padrão geradas!");
+                  } catch (e: any) {
+                    toast.error("Erro ao gerar tarefas: " + e.message);
+                  }
+                }}
+                className="flex items-center gap-2 px-3 py-2 bg-sky-600/10 text-sky-400 hover:bg-sky-600/20 text-sm font-medium rounded-lg transition-all border border-sky-500/20"
+              >
+                <Plus size={16} /> Gerar Tarefas Padrão
+              </button>
+            )}
             <button onClick={() => { setDeleteModalOpen(true); setDeleteInputName(''); }} className="flex items-center gap-2 px-3 py-2 bg-red-600/10 text-red-500 hover:bg-red-600/20 text-sm font-medium rounded-lg transition-all border border-red-500/20"><Trash2 size={16} /> Apagar</button>
             <div className="w-px bg-slate-700/50 mx-2" />
             <div className="relative group"><button className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium border border-slate-700 rounded-lg transition-all"><FileDown size={16} /> Exportar</button>

@@ -27,7 +27,7 @@ import {
 
 import {
   createTarefaRemote, toggleTarefaConcluidaRemote,
-  updateTarefaRemote, deleteTarefaRemote
+  updateTarefaRemote, deleteTarefaRemote, createStandardTasksRemote
 } from './taskService';
 
 import { Projeto, OrdemFabrico, Tarefa } from './types';

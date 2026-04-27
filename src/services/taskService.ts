@@ -46,3 +46,17 @@ export async function deleteTarefaRemote(tarefaId: number) {
   const { error } = await supabase.from('tarefas').delete().eq('id', tarefaId);
   if (error) throw error;
 }
+
+export async function createStandardTasksRemote(ofId: number) {
+  const predefinedTasks = [
+    { ordem_id: ofId, nome_tarefa: 'Modelação',                ordem_index: 0 },
+    { ordem_id: ofId, nome_tarefa: 'Aprovisionamento Material', ordem_index: 1 },
+    { ordem_id: ofId, nome_tarefa: 'Validação',                 ordem_index: 2 },
+    { ordem_id: ofId, nome_tarefa: 'Fabrico',                   ordem_index: 3 },
+    { ordem_id: ofId, nome_tarefa: 'Parafusaria',               ordem_index: 4 },
+    { ordem_id: ofId, nome_tarefa: 'Montagem',                   ordem_index: 5 },
+  ];
+
+  const { error } = await supabase.from('tarefas').insert(predefinedTasks);
+  if (error) throw error;
+}

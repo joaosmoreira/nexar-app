@@ -4,6 +4,9 @@ import { useAppStore } from '@/store/useAppStore';
 import { LayoutGrid, Layers, Archive, Factory, AlertTriangle, Clock, CalendarClock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
+import { microsoftService } from '@/services/microsoftService';
+import { Flag } from 'lucide-react';
+import { toast } from 'sonner';
 
 // Helper para navegar directamente para uma OF (define projecto + OF)
 function navigateToOf(projetoId: number, ofId: number) {
@@ -95,17 +98,54 @@ export function GlobalDashboard() {
         </div>
       )}
 
-      <div className="flex items-center gap-3 mb-8">
-        <div className={cn("p-3 rounded-xl shadow-lg border", isArchiveMode ? "bg-amber-500/20 text-amber-500 border-amber-500/30" : "bg-sky-500/20 text-sky-400 border-sky-500/30")}>
-           {isArchiveMode ? <Archive size={24} /> : <LayoutGrid size={24} />}
+      <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+        <div className="flex items-center gap-3">
+          <div className={cn("p-3 rounded-xl shadow-lg border", isArchiveMode ? "bg-amber-500/20 text-amber-500 border-amber-500/30" : "bg-sky-500/20 text-sky-400 border-sky-500/30")}>
+             {isArchiveMode ? <Archive size={24} /> : <LayoutGrid size={24} />}
+          </div>
+          <div>
+             <h1 className="text-2xl font-bold text-slate-100">
+               {isArchiveMode ? "Arquivo de Obras" : "Dashboard de Obras"}
+             </h1>
+             <p className="text-slate-400 mt-1">
+               {isArchiveMode ? "Consulta do histórico de portfólio" : "Ponto de situação global e ativo da fábrica"}
+             </p>
+          </div>
         </div>
-        <div>
-           <h1 className="text-2xl font-bold text-slate-100">
-             {isArchiveMode ? "Arquivo de Obras" : "Dashboard de Obras"}
-           </h1>
-           <p className="text-slate-400 mt-1">
-             {isArchiveMode ? "Consulta do histórico de portfólio" : "Ponto de situação global e ativo da fábrica"}
-           </p>
+
+        <div className="flex gap-2">
+          {import.meta.env.DEV && (
+            <button 
+              onClick={async () => {
+                const testSubject = prompt("Assunto do email simulado:", "GS1504 - Pedido Urgente OF 2026100");
+                if (!testSubject) return;
+                try {
+                  await microsoftService.simulateOutlookSync(testSubject);
+                  toast.success("Simulação concluída!");
+                  useAppStore.getState().incrementDataVersion();
+                } catch (e: any) {
+                  toast.error(e.message);
+                }
+              }}
+              className="flex items-center gap-2 px-4 py-2 bg-amber-600/10 hover:bg-amber-600/20 text-amber-400 border border-amber-500/20 rounded-xl transition-all font-medium text-sm"
+              title="Apenas visível em modo DEV"
+            >
+              <Flag size={16} fill="currentColor" />
+              Simular Outlook (Dev)
+            </button>
+          )}
+
+          {!isArchiveMode && (
+            <button 
+              onClick={async () => {
+                toast.error("Integração direta bloqueada pelo administrador do Azure.");
+              }}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-800/50 text-slate-500 border border-slate-700 rounded-xl cursor-not-allowed opacity-50 font-medium text-sm"
+            >
+              <Flag size={16} fill="currentColor" />
+              Sincronizar Outlook
+            </button>
+          )}
         </div>
       </div>
 

@@ -23,6 +23,8 @@ import { Auth } from "@/features/auth/components/Auth";
 import { PasswordReset } from "@/features/admin/components/PasswordReset";
 import { supabase } from "@/supabaseClient";
 import { ErrorBoundary } from "react-error-boundary";
+import { microsoftService } from "@/services/microsoftService";
+import { toast } from "sonner";
 // Carregamento Preguiçoso (Code-Splitting)
 const GlobalDashboard = lazy(() => import("@/features/projects/components/GlobalDashboard").then(m => ({ default: m.GlobalDashboard })));
 const ProjectView = lazy(() => import("@/features/projects/components/ProjectView").then(m => ({ default: m.ProjectView })));
@@ -95,6 +97,24 @@ function App() {
 
     return () => subscription.unsubscribe();
   }, [setUser]);
+
+  // ── Microsoft Outlook Auth Callback ───────────────────────────
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    if (code) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+      microsoftService.exchangeCodeForToken(code)
+        .then(tokens => {
+          localStorage.setItem('ms_tokens', JSON.stringify(tokens));
+          toast.success("Ligado ao Outlook com sucesso!");
+        })
+        .catch(err => {
+          console.error(err);
+          toast.error("Erro ao ligar ao Outlook");
+        });
+    }
+  }, []);
 
   // ── Fetch role after login (e sempre que dataVersion mudar) ───
   useEffect(() => {
