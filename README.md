@@ -2,7 +2,7 @@
 
 Gestor de projetos e ordens de fabrico (OF) desenvolvido em Tauri e React, com foco em performance e funcionamento offline-first.
 
-## 🏗️ Arquitetura Técnica (UML)
+## 🏗️ Arquitetura Técnica Detalhada (UML)
 
 ```mermaid
 classDiagram
@@ -10,38 +10,59 @@ classDiagram
         +User user
         +UserRole userRole
         +boolean isOnline
+        +boolean isSyncing
         +Projeto[] projects
         +OrdemFabrico[] ofs
+        +number selectedProjectId
+        +number selectedOfId
+        +string viewingUserId
         +setUser(user, session)
         +setSelectedProject(id)
+        +setSelectedOf(id)
         +setViewingUser(id, name)
+        +addOfs(newOfs)
     }
 
-    class ApiFacade {
+    class UnifiedApiFacade {
         <<Facade>>
         +fetchProjetos()
-        +fetchOfsByProjeto()
-        +createProjeto()
+        +fetchOfsByProjeto(projId)
+        +createProjeto(data)
+        +updateTarefa(id, data)
+        +toggleTarefaConcluida(id)
         +syncPending()
+    }
+
+    class DomainServices {
+        <<Internal Services>>
+        +ProjectService
+        +OfService
+        +TaskService
+        +MetricsService
+        +UserService
     }
 
     class OfflineEngine {
         +MutationQueue queue
         +LocalStorage cache
-        +queueMutation(action)
-        +flushMutations()
+        +readCache(key)
+        +writeCache(key, data)
+        +queueMutation(action, payload)
+        +flushPendingMutations()
     }
 
-    class SupabaseService {
-        <<Service>>
-        +auth
-        +from(table)
+    class SupabaseRemote {
+        <<Remote DB>>
+        +PostgreSQL
+        +RowLevelSecurity (RLS)
+        +Auth Service
     }
 
-    AppStore ..> ApiFacade : invokes
-    ApiFacade --> OfflineEngine : manages cache
-    ApiFacade --> SupabaseService : remote calls
-    OfflineEngine ..> SupabaseService : flushes to
+    AppStore ..> UnifiedApiFacade : UI Actions
+    UnifiedApiFacade --> DomainServices : Business Logic
+    UnifiedApiFacade --> OfflineEngine : Cache Management
+    DomainServices ..> SupabaseRemote : Remote Requests
+    OfflineEngine ..> SupabaseRemote : Data Synchronization
 ```
 
 ## 🛠️ Stack Tecnológica
