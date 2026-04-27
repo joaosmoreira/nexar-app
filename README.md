@@ -2,17 +2,47 @@
 
 Gestor de projetos e ordens de fabrico (OF) desenvolvido em Tauri e React, com foco em performance e funcionamento offline-first.
 
-## 🏗️ Arquitetura do Sistema
+## 🏗️ Arquitetura Técnica (UML)
 
-<div align="center">
-  <img src="public/architecture.png" alt="Nexar HUB Architecture" width="600" />
-</div>
+```mermaid
+classDiagram
+    class AppStore {
+        +User user
+        +UserRole userRole
+        +boolean isOnline
+        +Projeto[] projects
+        +OrdemFabrico[] ofs
+        +setUser(user, session)
+        +setSelectedProject(id)
+        +setViewingUser(id, name)
+    }
 
-| Camada | Descrição |
-| :--- | :--- |
-| **Interface** | React 19 & Tauri (Desktop nativo) |
-| **Orquestração** | Zustand (Global Store) & API Facade |
-| **Persistência** | Supabase (Cloud) & Cache Local (Offline) |
+    class ApiFacade {
+        <<Facade>>
+        +fetchProjetos()
+        +fetchOfsByProjeto()
+        +createProjeto()
+        +syncPending()
+    }
+
+    class OfflineEngine {
+        +MutationQueue queue
+        +LocalStorage cache
+        +queueMutation(action)
+        +flushMutations()
+    }
+
+    class SupabaseService {
+        <<Service>>
+        +auth
+        +from(table)
+    }
+
+    AppStore ..> ApiFacade : invokes
+    ApiFacade --> OfflineEngine : manages cache
+    ApiFacade --> SupabaseService : remote calls
+    OfflineEngine ..> SupabaseService : flushes to
+```
 
 ## 🛠️ Stack Tecnológica
 
