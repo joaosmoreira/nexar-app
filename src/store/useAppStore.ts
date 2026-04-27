@@ -86,12 +86,17 @@ export const useAppStore = create<AppState>()(
     const uniqueNewOfs = newOfs.filter(o => !existingIds.has(o.id));
     return { ofs: [...state.ofs, ...uniqueNewOfs] };
   }),
-  setUser: (user, session) => set({ 
-    user, 
-    session, 
-    selectedProjectId: null, 
-    selectedOfId: null, 
-    isUserMgmtOpen: false 
+  setUser: (user, session) => set((state) => {
+    if (user && state.user?.id === user.id) {
+      return { user, session };
+    }
+    return { 
+      user, 
+      session, 
+      selectedProjectId: null, 
+      selectedOfId: null, 
+      isUserMgmtOpen: false 
+    };
   }),
   setSelectedProject: (id) => set({ selectedProjectId: id, selectedOfId: null, isArchiveMode: false }),
   setSelectedOf: (id) => set({ selectedOfId: id, isArchiveMode: false }),
