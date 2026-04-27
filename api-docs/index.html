@@ -1,0 +1,111 @@
+<!DOCTYPE html><html class="default" lang="en" data-base="./"><head><meta charset="utf-8"/><meta http-equiv="x-ua-compatible" content="IE=edge"/><title>Nexar Work Manager</title><meta name="description" content="Documentation for Nexar Work Manager"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="assets/style.css"/><link rel="stylesheet" href="assets/highlight.css"/><script defer src="assets/main.js"></script><script async src="assets/icons.js" id="tsd-icons-script"></script><script async src="assets/search.js" id="tsd-search-script"></script><script async src="assets/navigation.js" id="tsd-nav-script"></script><script async src="assets/hierarchy.js" id="tsd-hierarchy-script"></script></head><body><script>document.documentElement.dataset.theme = localStorage.getItem("tsd-theme") || "os";document.body.style.display="none";setTimeout(() => window.app?app.showPage():document.body.style.removeProperty("display"),500)</script><header class="tsd-page-toolbar"><div class="tsd-toolbar-contents container"><a href="index.html" class="title">Nexar Work Manager</a><div id="tsd-toolbar-links"></div><button id="tsd-search-trigger" class="tsd-widget" aria-label="Search"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-search"></use></svg></button><dialog id="tsd-search" aria-label="Search"><input role="combobox" id="tsd-search-input" aria-controls="tsd-search-results" aria-autocomplete="list" aria-expanded="true" autocapitalize="off" autocomplete="off" placeholder="Search the docs" maxLength="100"/><ul role="listbox" id="tsd-search-results"></ul><div id="tsd-search-status" aria-live="polite" aria-atomic="true"><div>Preparing search index...</div></div></dialog><a href="#" class="tsd-widget menu" id="tsd-toolbar-menu-trigger" data-toggle="menu" aria-label="Menu"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-menu"></use></svg></a></div></header><div class="container container-main"><div class="col-content"><div class="tsd-page-title"><h1>Nexar Work Manager</h1></div><div class="tsd-panel tsd-typography"><div align="center">
+  <img src="https://img.icons8.com/?size=150&id=DREntqjQoW5N&format=png&color=000000" alt="Nexar Logo" width="80" />
+  <h1>Nexar HUB</h1>
+  <p><strong>Industrial Work Manager de Alta Performance</strong></p>
+  <p>
+    <img alt="Versão" src="https://img.shields.io/badge/Versão-v1.2.0-blue?style=flat-square"/>
+    <img alt="Tauri" src="https://img.shields.io/badge/Tauri-v2-24C8DB?style=flat-square&logo=tauri&logoColor=white"/>
+    <img alt="React" src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=white"/>
+    <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.8-3178C6?style=flat-square&logo=typescript&logoColor=white"/>
+    <img alt="Offline" src="https://img.shields.io/badge/Offline--First-✓-10B981?style=flat-square"/>
+  </p>
+</div>
+<hr>
+<h2 id="📌-visão-geral" class="tsd-anchor-link">📌 Visão Geral<a href="#📌-visão-geral" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>O <strong>Nexar HUB</strong> é uma solução desktop nativa (Windows &amp; macOS) desenvolvida para a gestão e monitorização de fluxos de trabalho industriais. Projetada para substituir a fragmentação de ficheiros Excel, a aplicação oferece um ambiente centralizado, seguro e <strong>offline-first</strong> para o controlo total da produção.</p>
+<p>A versão <strong>v1.2.0</strong> introduz ferramentas avançadas de gestão de equipa, permitindo uma supervisão completa da produtividade individual e centralização de repositórios BIM/Cloud.</p>
+<hr>
+<h2 id="🏗️-arquitetura-do-sistema" class="tsd-anchor-link">🏗️ Arquitetura do Sistema<a href="#🏗️-arquitetura-do-sistema" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>A aplicação utiliza uma estrutura modular para garantir escalabilidade e separação de responsabilidades. Abaixo encontra-se o mapa de componentes e fluxo de dados:</p>
+<pre><code class="mermaid">graph TD
+    subgraph "Camada de Interface (React 19)"
+        App[App.tsx] --> Sidebar[Sidebar Modular]
+        App --> Views[Vistas Carregadas via Lazy]
+        Sidebar --> Hooks[Hooks Customizados]
+        Views --> Hooks
+    end
+
+    subgraph "Camada de Estado (Zustand)"
+        Hooks --> Store[Global Cache Store]
+    end
+
+    subgraph "Camada de Serviços (API Modular)"
+        Hooks --> API[Fachada Unificada]
+        API --> PS[Project Service]
+        API --> OS[OF Service]
+        API --> TS[Task Service]
+        API --> US[User Service]
+    end
+
+    subgraph "Infraestrutura"
+        PS & OS & TS & US --> Supabase[(Supabase DB)]
+        PS & OS & TS & US --> Cache[Offline Engine]
+        Cache --> FS[Tauri File System]
+    end
+</code><button type="button">Copy</button></pre>
+
+<hr>
+<h2 id="🚀-funcionalidades-principais-v120" class="tsd-anchor-link">🚀 Funcionalidades Principais (v1.2.0)<a href="#🚀-funcionalidades-principais-v120" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<h3 id="👥-gestão-de-equipa-impersonação-v120" class="tsd-anchor-link">👥 Gestão de Equipa &amp; Impersonação (v1.2.0)<a href="#👥-gestão-de-equipa-impersonação-v120" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul>
+<li><strong>Modo Espião (Admin)</strong>: Visualize o dashboard individual de qualquer colaborador com um clique.</li>
+<li><strong>Identidade Real</strong>: Interface totalmente limpa de identificadores técnicos; nomes reais em toda a aplicação.</li>
+<li><strong>Atribuição Inteligente</strong>: Admins podem criar e atribuir obras diretamente a membros específicos.</li>
+<li><strong>UI/UX Premium</strong>: Otimização de tipografia para maior densidade de informação e novos seletores customizados.</li>
+</ul>
+<h3 id="📁-centralização-de-repositórios-bim" class="tsd-anchor-link">📁 Centralização de Repositórios BIM<a href="#📁-centralização-de-repositórios-bim" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul>
+<li><strong>Cloud Connect</strong>: Suporte para URLs de repositório (BIM, SharePoint) ao nível do projeto com atalhos de acesso rápido na barra lateral.</li>
+</ul>
+<h3 id="⚡-navegação-instantânea" class="tsd-anchor-link">⚡ Navegação Instantânea<a href="#⚡-navegação-instantânea" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul>
+<li><strong>Cache Global Inteligente</strong>: Obras e Ordens de Fabrico são pré-carregadas no store global, eliminando ecrãs de &quot;Loading&quot;.</li>
+<li><strong>Code-Splitting</strong>: Utilização de <code>React.lazy</code> para carregamento modular.</li>
+</ul>
+<h3 id="📴-robustez-offline-first" class="tsd-anchor-link">📴 Robustez Offline-First<a href="#📴-robustez-offline-first" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul>
+<li><strong>Full Sync</strong>: Funcionamento 100% autónomo com sincronização automática via fila de mutações.</li>
+<li><strong>Persistência Local</strong>: Cache de dados em JSON nativo.</li>
+</ul>
+<h3 id="🔐-segurança-e-rbac" class="tsd-anchor-link">🔐 Segurança e RBAC<a href="#🔐-segurança-e-rbac" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul>
+<li><strong>Controlo de Acessos</strong>: Diferenciação robusta entre Admin e User com RLS no Supabase.</li>
+<li><strong>Auto-Arquivo</strong>: Gestão automática de portfólio para obras concluídas.</li>
+<li><strong>Exportação Profissional</strong>: Gerador de relatórios Excel estilizados.</li>
+</ul>
+<hr>
+<h2 id="💻-stack-técnico" class="tsd-anchor-link">💻 Stack Técnico<a href="#💻-stack-técnico" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<ul>
+<li><strong>Runtime</strong>: <a href="https://tauri.app/">Tauri v2</a> (Rust Core)</li>
+<li><strong>Frontend</strong>: React 19 + TypeScript 5.8</li>
+<li><strong>Estilos</strong>: Tailwind CSS v4 (com animações de fluidez)</li>
+<li><strong>Estado</strong>: Zustand v5 (com persistência de cache)</li>
+<li><strong>Backend/Auth</strong>: Supabase (PostgreSQL)</li>
+<li><strong>Ordenação</strong>: <code>@dnd-kit</code> para Drag &amp; Drop industrial.</li>
+</ul>
+<hr>
+<h2 id="⚙️-instalação-e-build" class="tsd-anchor-link">⚙️ Instalação e Build<a href="#⚙️-instalação-e-build" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<h3 id="requisitos" class="tsd-anchor-link">Requisitos<a href="#requisitos" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul>
+<li>Node.js ≥ 22</li>
+<li>Rust (via rustup)</li>
+<li>Tauri CLI v2</li>
+</ul>
+<h3 id="setup" class="tsd-anchor-link">Setup<a href="#setup" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<pre><code class="bash"><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">install</span><br/><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">tauri</span><span class="hl-1"> </span><span class="hl-2">dev</span>
+</code><button type="button">Copy</button></pre>
+
+<h3 id="build-para-produção" class="tsd-anchor-link">Build para Produção<a href="#build-para-produção" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<pre><code class="bash"><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">tauri</span><span class="hl-1"> </span><span class="hl-2">build</span>
+</code><button type="button">Copy</button></pre>
+
+<hr>
+<h2 id="🍎-notas-macos" class="tsd-anchor-link">🍎 Notas macOS<a href="#🍎-notas-macos" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>A aplicação dispõe de suporte nativo para arquitetura Apple Silicon. Devido às políticas de segurança da Apple:</p>
+<ul>
+<li>Após instalar, se for bloqueado pelo Gatekeeper, aceda a <strong>Definições do Sistema &gt; Privacidade e Segurança</strong> e clique em <strong>&quot;Abrir Mesmo Assim&quot;</strong>.</li>
+</ul>
+<hr>
+<div align="center">
+  <p>Desenvolvido para excelência industrial e produtividade máxima.</p>
+</div></div></div><div class="col-sidebar"><div class="page-menu"><div class="tsd-navigation settings"><details class="tsd-accordion"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-chevronDown"></use></svg><h3>Settings</h3></summary><div class="tsd-accordion-details"><div class="tsd-filter-visibility"><span class="settings-label">Member Visibility</span><ul id="tsd-filter-options"><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-inherited" name="inherited" checked/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Inherited</span></label></li><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-external" name="external"/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>External</span></label></li></ul></div><div class="tsd-theme-toggle"><label class="settings-label" for="tsd-theme">Theme</label><select id="tsd-theme"><option value="os">OS</option><option value="light">Light</option><option value="dark">Dark</option></select></div></div></details></div><details open class="tsd-accordion tsd-page-navigation"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-chevronDown"></use></svg><h3>On This Page</h3></summary><div class="tsd-accordion-details"><a href="#📌-visão-geral"><span>📌 <wbr/>Visão <wbr/>Geral</span></a><a href="#🏗️-arquitetura-do-sistema"><span>🏗️ <wbr/>Arquitetura do <wbr/>Sistema</span></a><a href="#🚀-funcionalidades-principais-v120"><span>🚀 <wbr/>Funcionalidades <wbr/>Principais (v1.2.0)</span></a><ul><li><a href="#👥-gestão-de-equipa-impersonação-v120"><span>👥 <wbr/>Gestão de <wbr/>Equipa &amp; <wbr/>Impersonação (v1.2.0)</span></a></li><li><a href="#📁-centralização-de-repositórios-bim"><span>📁 <wbr/>Centralização de <wbr/>Repositórios <wbr/>BIM</span></a></li><li><a href="#⚡-navegação-instantânea"><span>⚡ <wbr/>Navegação <wbr/>Instantânea</span></a></li><li><a href="#📴-robustez-offline-first"><span>📴 <wbr/>Robustez <wbr/>Offline-<wbr/>First</span></a></li><li><a href="#🔐-segurança-e-rbac"><span>🔐 <wbr/>Segurança e <wbr/>RBAC</span></a></li></ul><a href="#💻-stack-técnico"><span>💻 <wbr/>Stack <wbr/>Técnico</span></a><a href="#⚙️-instalação-e-build"><span>⚙️ <wbr/>Instalação e <wbr/>Build</span></a><ul><li><a href="#requisitos"><span>Requisitos</span></a></li><li><a href="#setup"><span>Setup</span></a></li><li><a href="#build-para-produção"><span>Build para <wbr/>Produção</span></a></li></ul><a href="#🍎-notas-macos"><span>🍎 <wbr/>Notas mac<wbr/>OS</span></a></div></details></div><div class="site-menu"><nav class="tsd-navigation"><a href="modules.html">Nexar Work Manager</a><ul class="tsd-small-nested-navigation" id="tsd-nav-container"><li>Loading...</li></ul></nav></div></div></div><footer><p class="tsd-generator">Generated using <a href="https://typedoc.org/" target="_blank">TypeDoc</a></p></footer><div class="overlay"></div></body></html>
