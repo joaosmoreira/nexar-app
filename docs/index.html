@@ -1,33 +1,31 @@
 <!DOCTYPE html><html class="default" lang="en" data-base="./"><head><meta charset="utf-8"/><meta http-equiv="x-ua-compatible" content="IE=edge"/><title>Nexar Work Manager</title><meta name="description" content="Documentation for Nexar Work Manager"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="assets/style.css"/><link rel="stylesheet" href="assets/highlight.css"/><script defer src="assets/main.js"></script><script async src="assets/icons.js" id="tsd-icons-script"></script><script async src="assets/search.js" id="tsd-search-script"></script><script async src="assets/navigation.js" id="tsd-nav-script"></script><script async src="assets/hierarchy.js" id="tsd-hierarchy-script"></script></head><body><script>document.documentElement.dataset.theme = localStorage.getItem("tsd-theme") || "os";document.body.style.display="none";setTimeout(() => window.app?app.showPage():document.body.style.removeProperty("display"),500)</script><header class="tsd-page-toolbar"><div class="tsd-toolbar-contents container"><a href="index.html" class="title">Nexar Work Manager</a><div id="tsd-toolbar-links"></div><button id="tsd-search-trigger" class="tsd-widget" aria-label="Search"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-search"></use></svg></button><dialog id="tsd-search" aria-label="Search"><input role="combobox" id="tsd-search-input" aria-controls="tsd-search-results" aria-autocomplete="list" aria-expanded="true" autocapitalize="off" autocomplete="off" placeholder="Search the docs" maxLength="100"/><ul role="listbox" id="tsd-search-results"></ul><div id="tsd-search-status" aria-live="polite" aria-atomic="true"><div>Preparing search index...</div></div></dialog><a href="#" class="tsd-widget menu" id="tsd-toolbar-menu-trigger" data-toggle="menu" aria-label="Menu"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-menu"></use></svg></a></div></header><div class="container container-main"><div class="col-content"><div class="tsd-page-title"><h1>Nexar Work Manager</h1></div><div class="tsd-panel tsd-typography"><h1 id="nexar-hub" class="tsd-anchor-link">Nexar HUB<a href="#nexar-hub" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h1>
 <p>Gestor de projetos e ordens de fabrico (OF) desenvolvido em Tauri e React, com foco em performance e funcionamento offline-first.</p>
 <h2 id="🏗️-arquitetura-do-sistema" class="tsd-anchor-link">🏗️ Arquitetura do Sistema<a href="#🏗️-arquitetura-do-sistema" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
-<pre><code class="mermaid">graph TD
-    classDef frontend fill:#1e293b,stroke:#38bdf8,stroke-width:2px,color:#fff
-    classDef state fill:#1e293b,stroke:#f59e0b,stroke-width:2px,color:#fff
-    classDef api fill:#1e293b,stroke:#10b981,stroke-width:2px,color:#fff
-    classDef infra fill:#0f172a,stroke:#64748b,stroke-width:1px,color:#94a3b8
-
-    subgraph UI ["Interface (React)"]
-        A[App] --> B[Sidebar]
-        A --> C[Project/Of Views]
-    end
-
-    subgraph Logic ["Orquestração"]
-        D[Zustand Store] -- Sync --> UI
-        E[API Facade] -- Sync Logic --> D
-    end
-
-    subgraph Persistence ["Dados"]
-        E -- Online --> F[(Supabase)]
-        E -- Offline --> G[Cache Local]
-    end
-
-    class A,B,C frontend
-    class D state
-    class E api
-    class F,G infra
-</code><button type="button">Copy</button></pre>
-
+<div align="center">
+  <img src="media/architecture.png" alt="Nexar HUB Architecture" width="600" />
+</div>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Camada</th>
+<th style="text-align:left">Descrição</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>Interface</strong></td>
+<td style="text-align:left">React 19 &amp; Tauri (Desktop nativo)</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Orquestração</strong></td>
+<td style="text-align:left">Zustand (Global Store) &amp; API Facade</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Persistência</strong></td>
+<td style="text-align:left">Supabase (Cloud) &amp; Cache Local (Offline)</td>
+</tr>
+</tbody>
+</table>
 <h2 id="🛠️-stack-tecnológica" class="tsd-anchor-link">🛠️ Stack Tecnológica<a href="#🛠️-stack-tecnológica" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
 <ul>
 <li><strong>Frontend:</strong> React 19, TypeScript 5.8, Tailwind CSS v4</li>
