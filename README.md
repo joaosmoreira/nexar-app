@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://img.icons8.com/?size=150&id=DREntqjQoW5N&format=png&color=000000" alt="Nexar Logo" width="100" />
+  <img src="public/nexar_logo.png" alt="Nexar Logo" width="180" />
   <h1>Nexar HUB</h1>
   <p><strong>Industrial Work Manager de Alta Performance</strong></p>
   
@@ -14,80 +14,75 @@
 
 <br />
 
-## 🌟 O que é o Nexar HUB?
+## 🌟 Visão Global
 
-O **Nexar HUB** é uma solução desktop nativa (disponível para Windows & macOS) desenhada especificamente para a gestão e monitorização de fluxos de trabalho na indústria. Criada para substituir processos lentos baseados em folhas de cálculo e emails, a aplicação oferece um ambiente de trabalho centralizado, ultra-rápido e focado na produtividade.
+O **Nexar HUB** é uma aplicação desktop nativa concebida para revolucionar a forma como o chão de fábrica e os gabinetes de engenharia comunicam. Substituto direto das antiquadas folhas de cálculo, atua como o sistema central de rastreio de Obras, Ordens de Fabrico (OFs) e Tarefas de produção.
 
-Desenvolvido com uma arquitetura **Offline-First**, o Nexar HUB garante que as equipas no terreno ou em fábricas com acesso limitado à internet possam continuar a trabalhar sem qualquer interrupção, sincronizando todos os dados de forma transparente e segura em segundo plano.
+A aplicação brilha pelo seu motor **Offline-First**, que garante que, num ambiente de fábrica onde o sinal Wi-Fi pode falhar, nenhum dado se perde. O sistema arquiva localmente as ações de gestão de tarefas e sincroniza-as em *background* de forma silenciosa mal retoma a ligação aos servidores.
 
-<br />
+---
 
-## ✨ Funcionalidades em Destaque
+## ✨ Funcionalidades Core
 
-- 🚀 **Navegação Instantânea:** Componentes otimizados e sistema de *caching global* que elimina ecrãs de loading para as transições entre projetos e tarefas.
-- 📴 **Sincronização Offline-First:** Toda a aplicação funciona 100% de modo autónomo, gravando as ações localmente e sincronizando automaticamente assim que a ligação for restabelecida.
-- 👥 **Gestão Avançada de Equipa:** Administração completa de papéis (Admin/User), com a possibilidade de "Impersonação" para verificar o dashboard individual de cada colaborador.
-- 📁 **Cloud Connect:** Integração rápida com repositórios BIM e plataformas SharePoint ao nível da obra.
-- 📊 **Exportação Excel Profissional:** Geração de relatórios com um clique, apresentando os dados com um layout rigoroso e formatação premium.
-- 🔐 **Segurança e Controlo de Acesso:** Permissões blindadas, RLS na base de dados (Supabase) e auto-arquivo inteligente de obras concluídas.
+### 📴 Motor Offline-First e Sincronização Inteligente
+- **Fila de Mutações (Queue):** Cada interação (criar projeto, concluir tarefa, reordenar prioridades) é guardada localmente se a internet falhar.
+- **Background Sync:** O sistema detecta automaticamente a retoma da rede (`window.online`) e injeta os pacotes de dados pendentes no Supabase.
 
-<br />
+### 🏭 Gestão Industrial: Obras, OFs e Tarefas
+- **Dashboard Global:** Painel em tempo real com métricas da fábrica (OFs pendentes, projetos atrasados, taxa de conclusão).
+- **Hierarquia de Dados:** Estrutura "Projeto > Ordens de Fabrico > Tarefas".
+- **Drag & Drop Produtivo:** Utilização do `@dnd-kit` para reorganizar rapidamente as prioridades das tarefas numa OF.
 
-## 🛠️ Stack Tecnológico
+### 👥 Controlo de Administração e Impersonação
+- **Autenticação Segura:** Login centralizado via Supabase Auth.
+- **RBAC (Role-Based Access Control):** Contas de Administrador têm poderes absolutos para gerir contas, enquanto os Utilizadores gerem as suas tarefas.
+- **Modo "View As":** Administradores podem entrar diretamente na visão de um funcionário para lhe gerir a carga de trabalho sem necessidade de trocar credenciais.
 
-A aplicação foi desenhada com ferramentas de topo para garantir uma base sólida, expansível e hiper-rápida.
+### 📊 Relatórios e Analítica
+- **Geração de Excel:** Criação instantânea de folhas Excel formatadas e estilizadas para reportar a atividade diária e estados dos projetos de engenharia.
+- **Integração BIM:** Campos específicos para injetar links rápidos para pastas na nuvem (SharePoint) ou modelos BIM.
 
-| Frontend | Backend & Infra | Desktop Engine |
-| :--- | :--- | :--- |
-| **React 19** | **Supabase** (PostgreSQL) | **Tauri v2** (Rust) |
-| **TypeScript 5.8** | Row Level Security (RLS) | File System API nativa |
-| **Tailwind CSS v4** | Auto-arquivamento Cloud | Notificações Desktop |
-| **Zustand v5** | Autenticação Segura | Multi-Platform (Win/Mac) |
+### ⚡ Navegação e UI/UX
+- **Comando de Pesquisa Global (CMD+K):** Acesso ultrarrápido a qualquer projeto ou OF em 1 segundo.
+- **UI de Alta Densidade:** Construída com Tailwind CSS para garantir que a máxima informação está visível sem criar ruído visual.
 
-<br />
+---
 
-## 📚 Documentação (Javadocs)
+## 🛠️ Stack Tecnológico Detalhado
 
-A documentação completa do código fonte (interfaces, hooks, serviços e componentes) encontra-se disponível no formato web interativo (via TypeDoc).
+O Nexar HUB é construído num stack hiper-otimizado para garantir que se sente "leve como uma pluma, forte como o aço":
 
-Para aceder:
-1. Abra o seu terminal.
-2. Execute o comando local:
-   ```bash
-   npm run serve-docs
-   ```
-3. Aceda ao link disponibilizado no browser para navegar pelo mapa de funções da aplicação.
+- **Core Desktop:** `Tauri v2` (escrito em Rust) para criar binários ultraleves.
+- **Framework UI:** `React 19` com code-splitting (`React.lazy`).
+- **Linguagem:** `TypeScript 5.8` para rigor absoluto de tipagem.
+- **Estado Global:** `Zustand v5` com módulo de persistência local para cache instantânea.
+- **Base de Dados:** `Supabase` (PostgreSQL) com RLS (*Row Level Security*).
+- **Estilos:** `Tailwind CSS v4`.
+- **Drag & Drop:** `@dnd-kit/core`.
 
-<br />
+---
 
-## ⚙️ Como Começar (Para Developers)
+## ⚙️ Para Developers
 
-### 1. Pré-requisitos
-Certifique-se que a sua máquina tem instalado:
-- **Node.js** (v22 ou superior)
-- **Rust** e o toolchain associado (via `rustup`)
+### 1. Documentação (Javadocs)
+Toda a documentação técnica dos serviços, _hooks_ e interfaces foi extraída com o **TypeDoc**.  
+Para ler o manual de código interativo:
+```bash
+npm run serve-docs
+```
 
-### 2. Instalação e Desenvolvimento
-Clone o repositório, instale as dependências e inicie o ambiente de desenvolvimento.
+### 2. Arranque Local
+O ambiente necessita de **Node.js 22+** e **Rust** (`rustup`).
 ```bash
 npm install
 npm run tauri dev
 ```
 
-### 3. Compilação para Produção
-Gera os ficheiros instaláveis (`.exe` no Windows, `.dmg` / `.app` no macOS).
+### 3. Build (Compilação Nativa)
+Para gerar o executável final `.exe` ou `.dmg`:
 ```bash
 npm run tauri build
 ```
-
-<br />
-
-## 🍎 Notas Exclusivas macOS
-
-Sendo uma aplicação nativa preparada para a arquitetura Apple Silicon, as políticas do sistema da Apple (*Gatekeeper*) poderão bloquear a primeira execução de aplicações não distribuídas pela App Store.
-Se a aplicação não abrir, vá a **Definições do Sistema > Privacidade e Segurança** e clique em **"Abrir Mesmo Assim"** para adicionar a exceção.
-
-<br />
 
 ---
 <div align="center">
