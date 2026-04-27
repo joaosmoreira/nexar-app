@@ -1,5 +1,4 @@
 <div align="center">
-  <img src="public/nexar_logo.png" alt="Nexar Logo" width="180" />
   <h1>Nexar HUB</h1>
   <p><strong>Industrial Work Manager de Alta Performance</strong></p>
   
