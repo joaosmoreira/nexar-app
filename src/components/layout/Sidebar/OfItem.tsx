@@ -3,7 +3,7 @@ import { useAppStore } from '@/store/useAppStore';
 import { cn } from '@/lib/utils';
 import { OrdemFabrico } from '@/services/api';
 
-interface OfItemProps {
+export interface OfItemProps {
   ofData: OrdemFabrico;
 }
 

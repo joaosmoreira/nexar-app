@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 import { Session, User } from '@supabase/supabase-js';
 import { UserRole, Projeto, OrdemFabrico } from '../services/api';
 
-interface AppState {
+export interface AppState {
   user: User | null;
   session: Session | null;
   selectedProjectId: number | null;

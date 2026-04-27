@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Save, StickyNote, CheckCircle2 } from 'lucide-react';
 
 
-interface NotesPanelProps {
+export interface NotesPanelProps {
   value: string;
   onChange: (v: string) => void;
   onSave: () => Promise<void> | void;

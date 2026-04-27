@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "docs": "typedoc",
-    "serve-docs": "npx serve api-docs"
+    "serve-docs": "npx serve docs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

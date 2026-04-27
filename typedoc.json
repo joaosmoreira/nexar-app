@@ -1,7 +1,7 @@
 {
   "entryPoints": ["src"],
   "entryPointStrategy": "expand",
-  "out": "api-docs",
+  "out": "docs",
   "name": "Nexar Work Manager",
   "exclude": ["**/*.test.tsx", "**/*.spec.ts", "**/node_modules/**"],
   "excludePrivate": true,

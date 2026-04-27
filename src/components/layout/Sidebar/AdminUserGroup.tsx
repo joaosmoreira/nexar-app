@@ -5,7 +5,7 @@ import { Projeto, UserWithRole } from '@/services/api';
 import { cn } from '@/lib/utils';
 import { ProjectItem } from './ProjectItem';
 
-interface AdminUserGroupProps {
+export interface AdminUserGroupProps {
   userInfo: UserWithRole;
   projetos: Projeto[];
   deadlineProjectIds: number[];

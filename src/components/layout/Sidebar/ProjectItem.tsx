@@ -7,7 +7,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { OfItem } from './OfItem';
 
-interface ProjectItemProps {
+export interface ProjectItemProps {
   projeto: Projeto;
   deadlineProjectIds: number[];
   completedProjectIds: number[];
