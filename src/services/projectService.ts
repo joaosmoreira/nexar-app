@@ -121,10 +121,30 @@ export async function updateProjetoRemote(projetoId: number, fields: { anexo_url
   if (error) throw error;
 }
 
-export async function reorderProjetosRemote(projetos: { id: number; ordem_index: number }[]) {
+async function reorderItemsRemote(tableName: string, items: { id: number; ordem_index: number }[]) {
   const { error } = await supabase.rpc('reorder_items', {
-    table_name: 'projectos',
-    updates: projetos
+    table_name: tableName,
+    updates: items
   });
-  if (error) throw error;
+
+  if (!error) return;
+
+  const shouldFallback =
+    error.code === '42883' ||
+    error.message?.toLowerCase().includes('could not find the function');
+
+  if (!shouldFallback) throw error;
+
+  for (const item of items) {
+    const { error: updateError } = await supabase
+      .from(tableName)
+      .update({ ordem_index: item.ordem_index })
+      .eq('id', item.id);
+
+    if (updateError) throw updateError;
+  }
+}
+
+export async function reorderProjetosRemote(projetos: { id: number; ordem_index: number }[]) {
+  await reorderItemsRemote('projectos', projetos);
 }
